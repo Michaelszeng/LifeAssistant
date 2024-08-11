@@ -148,41 +148,78 @@ def main(request: Optional[dict[str, Any]] = None) -> str:
     """
     global sync_token
 
-    # First re-establish listener so that it never expires
+    # First re-establish calendar watcher so that it never expires
     resource_id, channel_id = get_calendar_watcher_data()
     if resource_id and channel_id:  # Stop the old watcher
         stop_calendar_watcher(resource_id, channel_id)
     # Establish new watcher
     start_calendar_watcher()
 
-    # Retrieve updated events
-    events_result = service.events().list(
-        calendarId=calendar_id,
-        maxResults=2500,  # max of 2500
-        singleEvents=True,
-        syncToken=sync_token,
-    ).execute()
+    data = request.json
 
-    events = events_result.get('items', [])
-    print(f'Retrieved {len(events)} events')
+    if not data:  # GCal event updated
+        # Retrieve updated events
+        events_result = service.events().list(
+            calendarId=calendar_id,
+            maxResults=2500,  # max of 2500
+            singleEvents=True,
+            syncToken=sync_token,
+        ).execute()
 
-    # Process events
-    for event in events:
-        if event.get('status', "") == "confirmed":  # Event made or modified
-            print('Event:', event)
+        events = events_result.get('items', [])
+        print(f'Retrieved {len(events)} events')
 
-    # Update sync token
-    sync_token = events_result.get('nextSyncToken')
+        # Process events
+        for event in events:
+            if event.get('status', "") == "confirmed":  # Event made or modified
+                print('GCal event made or modified:', event)
 
-    if DEBUG:
-        print('New sync token:', sync_token)
+        # Update sync token
+        sync_token = events_result.get('nextSyncToken')
 
-    store_token(sync_token)
-                
+        if DEBUG:
+            print('New sync token:', sync_token)
+
+        store_token(sync_token)
+
+    else:  # TODOist task update
+        if 'event_name' in data and data['event_data']['project_id'] in todoist_projects and not data['event_data']['is_deleted'] and (data['event_name'] == 'item:added' or data['event_name'] == 'item:updated'):
+            # Process the new task
+            print(f"TODOist task added/updated: {data['event_data']['content']}")
+
     return 'OK', 200
 
 
-data: dict[str, Any] = {}
+
+
+
+################################################################################
+### Build fake Flask Request for testing
+################################################################################
+
+from flask import Request
+from werkzeug.test import EnvironBuilder
+from werkzeug.wrappers import Request as WerkzeugRequest
+
+# Define minimal headers (only essential ones)
+headers = {
+    "Host": "localhost",
+    "Content-Type": "application/json",
+}
+
+# Define an empty JSON body
+body = b'{}'
+
+# Create the environment builder
+builder = EnvironBuilder(
+    method='POST',
+    headers=headers,
+    data=body,
+)
+# Build the environment
+env = builder.get_environ()
+request = Request(env)
+
 
 if __name__ == "__main__":
-    main(data)
+    main(request)
