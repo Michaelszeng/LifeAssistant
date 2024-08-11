@@ -3,6 +3,7 @@ from googleapiclient.discovery import build
 from google.oauth2 import service_account
 from typing import Any, Optional
 from datetime import datetime, timedelta, timezone
+import uuid
 import time
 
 from data import *
@@ -10,7 +11,7 @@ from data import *
 DEBUG = 0
 
 SCOPES = ['https://www.googleapis.com/auth/calendar']
-SERVICE_ACCOUNT_FILE = 'service_account_v3.json'
+SERVICE_ACCOUNT_FILE = 'service_account.json'
 
 credentials = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
 service = build('calendar', 'v3', credentials=credentials)
@@ -32,6 +33,66 @@ def get_token():
 def store_token(token):
     with open("token.txt", "w") as f:
         f.write(str(datetime.now().date()) + " " + token)
+
+
+def get_calendar_watcher_data():
+    try:
+        with open("calendar_watcher_data.txt", "r") as f:
+            resource_id, channel_id = f.readline().split(" ")
+    except FileNotFoundError:
+        resource_id = None
+        channel_id = None
+    return resource_id, channel_id
+
+
+def store_calendar_watcher_data(resource_id, channel_id):
+    with open("calendar_watcher_data.txt", "w") as f:
+        f.write(resource_id + " " + channel_id)
+
+
+def stop_calendar_watcher(resource_id, channel_id):
+    request_body = {
+        'id': channel_id,
+        'resourceId': resource_id,
+    }
+
+    try:
+        request = service.channels().stop(body=request_body)
+        response = request.execute()
+        print('Watcher Stop succeeded.')
+    except Exception as e:
+        print('An error occurred:', e)
+
+
+def start_calendar_watcher():
+    channel_id = str(uuid.uuid4())
+
+    request_body = {
+        'id': channel_id,  # A unique string ID for this channel
+        'type': 'web_hook',         # Type of delivery method
+        'address': cloud_function_address,  # The Google Cloud Function URL
+    }
+
+    try:
+        request = service.events().watch(calendarId=calendar_id, body=request_body)
+        response = request.execute()
+        print('\nWatch response:', response)
+
+        resource_id = response.get("resourceId", None)
+        store_calendar_watcher_data(resource_id, channel_id)
+
+    except Exception as e:
+        print('An error occurred:', e)
+
+
+################################################################################
+### Establish Listener to Calendar
+################################################################################
+resource_id, channel_id = get_calendar_watcher_data()
+if resource_id and channel_id:  # Stop the old watcher
+    stop_calendar_watcher(resource_id, channel_id)
+# Establish new watcher
+start_calendar_watcher()
 
 
 ################################################################################
@@ -87,6 +148,13 @@ def main(request: Optional[dict[str, Any]] = None) -> str:
     """
     global sync_token
 
+    # First re-establish listener so that it never expires
+    resource_id, channel_id = get_calendar_watcher_data()
+    if resource_id and channel_id:  # Stop the old watcher
+        stop_calendar_watcher(resource_id, channel_id)
+    # Establish new watcher
+    start_calendar_watcher()
+
     # Retrieve updated events
     events_result = service.events().list(
         calendarId=calendar_id,
@@ -100,7 +168,7 @@ def main(request: Optional[dict[str, Any]] = None) -> str:
 
     # Process events
     for event in events:
-        if event.status == "confirmed":  # Event made or modified
+        if event.get('status', "") == "confirmed":  # Event made or modified
             print('Event:', event)
 
     # Update sync token
