@@ -1,5 +1,5 @@
 env
 *.json
-token.txt
+gcal_sync_token.txt
 calendar_watcher_data.txt
 data.py

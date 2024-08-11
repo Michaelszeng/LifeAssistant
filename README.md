@@ -1,6 +1,10 @@
 # Life Assistant
 
-A LLM Integration with your Google Calendar
+A LLM Integration with your Google Calendar and Todoist to send you relevant reminders (via text message) related your events and tasks. You can customize/slowly accrue the list of reminders you want.
+
+## Current TODOs:
+- Either create scheduler for Cloud Function or figure out how to remove expiration on calendar watcher
+- TODOist integration, LLM integration, text message integration
 
 ## Installation and Setup
 
@@ -21,8 +25,10 @@ A LLM Integration with your Google Calendar
 - Create a file in the outermost directory called `data.py`
 - Enter this data into `data.py`:
 ```python
-calendar_id = 'Your Calendar ID (i.e. \'primary\', or \'your_email@gmail.com\')'
+calendar_id = 'Your Calendar ID (i.e. 'primary', or 'your_email@gmail.com')'
 cloud_function_address = 'Your Google Cloud Function URL'
+todoist_api_token = 'Your TODOist account API token (see https://todoist.com/help/articles/find-your-api-token-Jpzx9IIlB)'
+phone_number = 'XXXYYYZZZZ'
 ```
 
 You can find your calendar ID by going to your Google Calendar, clicking on the three dots next to your calendar in the bottom left, --> "Settings and Sharing" --> "Calendar ID".

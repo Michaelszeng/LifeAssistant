@@ -22,7 +22,7 @@ service = build('calendar', 'v3', credentials=credentials)
 ################################################################################
 def get_token():
     try:
-        with open("token.txt", "r") as f:
+        with open("gcal_sync_token.txt", "r") as f:
             date, token = f.readline().split(" ")
     except FileNotFoundError:
         token = None
@@ -31,7 +31,7 @@ def get_token():
 
 
 def store_token(token):
-    with open("token.txt", "w") as f:
+    with open("gcal_sync_token.txt", "w") as f:
         f.write(str(datetime.now().date()) + " " + token)
 
 
