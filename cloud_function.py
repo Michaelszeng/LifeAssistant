@@ -2,6 +2,7 @@
 from googleapiclient.discovery import build
 from google.oauth2 import service_account
 from google.cloud import tasks_v2
+from google.cloud import firestore
 from google.protobuf import timestamp_pb2
 
 from typing import Any, Optional
@@ -24,73 +25,127 @@ SERVICE_ACCOUNT_FILE = 'service_account.json'
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = SERVICE_ACCOUNT_FILE
 TEXT_SCHEDULE_FILE = 'scheduled_tasks.json'
 
+# Retrieve service account
 credentials = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
+
+# Initialize Calendar
 service = build('calendar', 'v3', credentials=credentials)
+
+# Initialize Firestore
+db = firestore.Client()
+
+# Firestore data
+TOKEN_DOC = 'sync_token'
+WATCHER_DOC = 'calendar_watcher_data'
+TASKS_DOC = 'scheduled_tasks'
+COLLECTION = 'LifeAssistant'  # Replace with your Firestore collection name
 
 
 ################################################################################
 ### Helper Functions
 ################################################################################
 def get_token():
-    try:
-        with open("gcal_sync_token.txt", "r") as f:
-            date, token = f.readline().split(" ")
-    except FileNotFoundError:
+    doc_ref = db.collection(COLLECTION).document(TOKEN_DOC)
+    doc = doc_ref.get()
+    
+    if doc.exists:
+        data = doc.to_dict()
+        token = data.get('token')
+        date = data.get('date')
+    else:
         token = None
         date = None
+    
     return token, date
 
 
 def store_token(token):
-    with open("gcal_sync_token.txt", "w") as f:
-        f.write(str(datetime.now().date()) + " " + token)
+    doc_ref = db.collection(COLLECTION).document(TOKEN_DOC)
+    doc_ref.set({
+        'date': str(datetime.now().date()),
+        'token': token
+    })
 
 
 def get_calendar_watcher_data():
-    try:
-        with open("calendar_watcher_data.txt", "r") as f:
-            resource_id, channel_id = f.readline().split(" ")
-    except FileNotFoundError:
+    doc_ref = db.collection(COLLECTION).document(WATCHER_DOC)
+    doc = doc_ref.get()
+    
+    if doc.exists:
+        data = doc.to_dict()
+        resource_id = data.get('resource_id')
+        channel_id = data.get('channel_id')
+    else:
         resource_id = None
         channel_id = None
+    
     return resource_id, channel_id
 
 
 def store_calendar_watcher_data(resource_id, channel_id):
-    with open("calendar_watcher_data.txt", "w") as f:
-        f.write(resource_id + " " + channel_id)
+    doc_ref = db.collection(COLLECTION).document(WATCHER_DOC)
+    doc_ref.set({
+        'resource_id': resource_id,
+        'channel_id': channel_id
+    })
 
 
 def get_scheduled_tasks():
-    # Load the existing tasks from the log file
-    if not os.path.exists(TEXT_SCHEDULE_FILE):
-        print(f"Log file {TEXT_SCHEDULE_FILE} does not exist.")
-        return
+    doc_ref = db.collection(COLLECTION).document(TASKS_DOC)
+    doc = doc_ref.get()
     
-    with open(TEXT_SCHEDULE_FILE, 'r') as file:
-        try:
-            data = json.load(file)
-        except json.JSONDecodeError:
-            print(f"Error reading {TEXT_SCHEDULE_FILE}.")
-            return
-        
+    if doc.exists:
+        data = doc.to_dict().get('tasks', [])
+    else:
+        data = []
+    
     return data
 
 
-def store_scheduled_tasks(log_entry):
-    if os.path.exists(TEXT_SCHEDULE_FILE):
-        with open(TEXT_SCHEDULE_FILE, 'r+') as file:
-            try:  # Load existing data
-                data = json.load(file)
-            except json.JSONDecodeError:
-                data = []
-            data.append(log_entry)  # Append the new log entry
-            # Move the file pointer to the beginning and overwrite the file
-            file.seek(0)
-            json.dump(data, file, indent=4)
+def add_scheduled_task(log_entry):
+    doc_ref = db.collection(COLLECTION).document(TASKS_DOC)
+    doc = doc_ref.get()
+    
+    if doc.exists:
+        data = doc.to_dict().get('tasks', [])
     else:
-        with open(TEXT_SCHEDULE_FILE, 'w') as file:  # If the file doesn't exist, create it and write the first log entry
-            json.dump([log_entry], file, indent=4)
+        data = []
+    
+    data.append(log_entry)
+    
+    doc_ref.set({
+        'tasks': data
+    })
+
+
+def remove_scheduled_task(event_id):
+    data = get_scheduled_tasks()
+
+    # Find the task corresponding to the event_id
+    task_to_delete = None
+    for entry in data:
+        if entry['event_id'] == event_id:
+            task_to_delete = entry
+            break
+
+    if not task_to_delete:
+        print(f"No task found for event_id: {event_id}")
+        return None
+
+    task_name = task_to_delete['task_name']
+
+    # Remove the task from the list
+    updated_data = [entry for entry in data if entry['event_id'] != event_id]
+
+    # Write the updated list back to the Firestore document
+    doc_ref = db.collection(COLLECTION).document(TASKS_DOC)
+    doc_ref.set({
+        'tasks': updated_data
+    })
+    
+    print(f"Log entry for event_id {event_id} deleted successfully.")
+
+    return task_name
 
 
 def stop_calendar_watcher(resource_id, channel_id):
@@ -171,37 +226,10 @@ def schedule_text_message(event_id, message, schedule_time):
         'event_id': event_id,
         'schedule_time': schedule_time.isoformat()
     }
-    store_scheduled_tasks(log_entry)
+    add_scheduled_task(log_entry)
 
     # TEMPORARY
     send_push_notif("this is a test message!", event_id)
-
-    return task_name
-
-
-def remove_task_from_scheduled_tasks_file(event_id):
-    data = get_scheduled_tasks()
-
-    # Find the task corresponding to the event_id
-    task_to_delete = None
-    for entry in data:
-        if entry['event_id'] == event_id:
-            task_to_delete = entry
-            break
-
-    if not task_to_delete:
-        print(f"No task found for event_id: {event_id}")
-        return
-
-    task_name = task_to_delete['task_name']
-
-    # Remove the log entry from the JSON file
-    data = [entry for entry in data if entry['event_id'] != event_id]
-
-    # Write the updated list back to the JSON file
-    with open(TEXT_SCHEDULE_FILE, 'w') as file:
-        json.dump(data, file, indent=4)
-    print(f"Log entry for event_id {event_id} deleted successfully.")
 
     return task_name
 
@@ -210,7 +238,7 @@ def cancel_text_message(event_id):
     client = tasks_v2.CloudTasksClient()
     
     # Remove task from task log
-    task_name = remove_task_from_scheduled_tasks_file(event_id)
+    task_name = remove_scheduled_task(event_id)
 
     # Delete the task from Google Cloud Tasks
     try:
@@ -235,7 +263,7 @@ def send_push_notif(message_body, event_id):
     print("Sent Push Notification.")
 
     # After task is complete (text is sent), remove it from the tasks log
-    remove_task_from_scheduled_tasks_file(event_id)
+    remove_scheduled_task(event_id)
 
 
 ################################################################################
