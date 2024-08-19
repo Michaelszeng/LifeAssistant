@@ -1,9 +1,18 @@
 # import functions_framework
 from googleapiclient.discovery import build
 from google.oauth2 import service_account
+from google.cloud import tasks_v2
+from google.protobuf import timestamp_pb2
+
 from typing import Any, Optional
 from datetime import datetime, timedelta, timezone
+from dateutil import parser
+import http.client, urllib
+import smtplib
 import uuid
+import json
+import os
+import pytz
 import time
 
 from data import *
@@ -12,6 +21,8 @@ DEBUG = 0
 
 SCOPES = ['https://www.googleapis.com/auth/calendar']
 SERVICE_ACCOUNT_FILE = 'service_account.json'
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = SERVICE_ACCOUNT_FILE
+TEXT_SCHEDULE_FILE = 'scheduled_tasks.json'
 
 credentials = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
 service = build('calendar', 'v3', credentials=credentials)
@@ -50,6 +61,38 @@ def store_calendar_watcher_data(resource_id, channel_id):
         f.write(resource_id + " " + channel_id)
 
 
+def get_scheduled_tasks():
+    # Load the existing tasks from the log file
+    if not os.path.exists(TEXT_SCHEDULE_FILE):
+        print(f"Log file {TEXT_SCHEDULE_FILE} does not exist.")
+        return
+    
+    with open(TEXT_SCHEDULE_FILE, 'r') as file:
+        try:
+            data = json.load(file)
+        except json.JSONDecodeError:
+            print(f"Error reading {TEXT_SCHEDULE_FILE}.")
+            return
+        
+    return data
+
+
+def store_scheduled_tasks(log_entry):
+    if os.path.exists(TEXT_SCHEDULE_FILE):
+        with open(TEXT_SCHEDULE_FILE, 'r+') as file:
+            try:  # Load existing data
+                data = json.load(file)
+            except json.JSONDecodeError:
+                data = []
+            data.append(log_entry)  # Append the new log entry
+            # Move the file pointer to the beginning and overwrite the file
+            file.seek(0)
+            json.dump(data, file, indent=4)
+    else:
+        with open(TEXT_SCHEDULE_FILE, 'w') as file:  # If the file doesn't exist, create it and write the first log entry
+            json.dump([log_entry], file, indent=4)
+
+
 def stop_calendar_watcher(resource_id, channel_id):
     request_body = {
         'id': channel_id,
@@ -71,6 +114,7 @@ def start_calendar_watcher():
         'id': channel_id,  # A unique string ID for this channel
         'type': 'web_hook',         # Type of delivery method
         'address': cloud_function_address,  # The Google Cloud Function URL
+        'expiration': 1893456000000,  # Basically will cap at Google's 30 day limit.
     }
 
     try:
@@ -85,8 +129,117 @@ def start_calendar_watcher():
         print('An error occurred:', e)
 
 
+def schedule_text_message(event_id, message, schedule_time):
+    client = tasks_v2.CloudTasksClient()
+
+    # Define the queue path
+    project = google_cloud_project_id
+    queue = 'text-messages'
+    location = 'us-central1'
+    parent = client.queue_path(project, location, queue)
+
+    # Prepare the payload
+    payload = {
+        'text_message': True,
+        'event_id': event_id,
+        'message': message
+    }
+
+    # Create the task
+    task = {
+        'http_request': {  
+            'http_method': tasks_v2.HttpMethod.POST,
+            'url': cloud_function_address,  
+            'headers': {'Content-Type': 'application/json'},
+            'body': json.dumps(payload).encode()
+        }
+    }
+
+    # Convert the schedule_time to a timestamp
+    timestamp = timestamp_pb2.Timestamp()
+    timestamp.FromDatetime(schedule_time)
+    task['schedule_time'] = timestamp
+
+    # Create the task in the queue
+    response = client.create_task(parent=parent, task=task)
+    task_name = response.name
+    print(f'Task created: {task_name}')
+
+    # Write the payload and task_name to a JSON file for tracking
+    log_entry = {
+        'task_name': task_name,
+        'event_id': event_id,
+        'schedule_time': schedule_time.isoformat()
+    }
+    store_scheduled_tasks(log_entry)
+
+    # TEMPORARY
+    send_push_notif("this is a test message!", event_id)
+
+    return task_name
+
+
+def remove_task_from_scheduled_tasks_file(event_id):
+    data = get_scheduled_tasks()
+
+    # Find the task corresponding to the event_id
+    task_to_delete = None
+    for entry in data:
+        if entry['event_id'] == event_id:
+            task_to_delete = entry
+            break
+
+    if not task_to_delete:
+        print(f"No task found for event_id: {event_id}")
+        return
+
+    task_name = task_to_delete['task_name']
+
+    # Remove the log entry from the JSON file
+    data = [entry for entry in data if entry['event_id'] != event_id]
+
+    # Write the updated list back to the JSON file
+    with open(TEXT_SCHEDULE_FILE, 'w') as file:
+        json.dump(data, file, indent=4)
+    print(f"Log entry for event_id {event_id} deleted successfully.")
+
+    return task_name
+
+
+def cancel_text_message(event_id):
+    client = tasks_v2.CloudTasksClient()
+    
+    # Remove task from task log
+    task_name = remove_task_from_scheduled_tasks_file(event_id)
+
+    # Delete the task from Google Cloud Tasks
+    try:
+        client.delete_task(name=task_name)
+        print(f'Task {task_name} deleted successfully')
+    except Exception as e:
+        print(f"Error deleting task {task_name}: {e}")
+        return
+
+
+def send_push_notif(message_body, event_id):
+    conn = http.client.HTTPSConnection("api.pushover.net:443")
+    conn.request("POST", "/1/messages.json",
+    urllib.parse.urlencode({
+        "token": pushover_api_token,
+        "user": pushover_user_key,
+        "title": "LifeAssistant",
+        "message": message_body,
+    }), { "Content-type": "application/x-www-form-urlencoded" })
+    conn.getresponse()
+    
+    print("Sent Push Notification.")
+
+    # After task is complete (text is sent), remove it from the tasks log
+    remove_task_from_scheduled_tasks_file(event_id)
+
+
 ################################################################################
-### Establish Listener to Calendar
+### Establish watcher for Calendar
 ################################################################################
 resource_id, channel_id = get_calendar_watcher_data()
 if resource_id and channel_id:  # Stop the old watcher
@@ -173,6 +326,28 @@ def main(request: Optional[dict[str, Any]] = None) -> str:
         for event in events:
             if event.get('status', "") == "confirmed":  # Event made or modified
                 print('GCal event made or modified:', event)
+                event_id = event.get('id')
+
+                # In case this event has been modified instead of created, attempt to cancel its associated text message.
+                # If this event is new, cancel_text_message() will fail gracefully
+                cancel_text_message(event_id)
+
+                # Extract event start datetime
+                date_time_str = event['dateTime']
+                time_zone_str = event['timeZone']
+                naive_datetime = datetime.fromisoformat(date_time_str)
+                time_zone = pytz.timezone(time_zone_str)
+                event_start_time = time_zone.localize(naive_datetime)
+                text_schedule_time = event_start_time - timedelta(hours=4)  # Ready to be passed to schedule_text_message()
+
+                message = "test!"
+                schedule_text_message(event_id, message, text_schedule_time)
+
+            elif event.get('status', "") == "cancelled":  # Event made or modified
+                print('GCal event cancelled:', event)
+                event_id = event.get('id')
+
+                cancel_text_message(event_id)
 
         # Update sync token
         sync_token = events_result.get('nextSyncToken')
@@ -182,10 +357,24 @@ def main(request: Optional[dict[str, Any]] = None) -> str:
 
         store_token(sync_token)
 
-    else:  # TODOist task update
-        if 'event_name' in data and data['event_data']['project_id'] in todoist_projects and not data['event_data']['is_deleted'] and (data['event_name'] == 'item:added' or data['event_name'] == 'item:updated'):
+    else:  
+        if 'text_message' in data:  # Text message task
+            send_push_notif(data['message'], data['event_id'])
+
+        # TODOist task update
+        elif 'event_name' in data and data['event_data']['project_id'] in todoist_projects and not data['event_data']['is_deleted'] and (data['event_name'] == 'item:added' or data['event_name'] == 'item:updated'):
             # Process the new task
             print(f"TODOist task added/updated: {data['event_data']['content']}")
+            
+            task_id = data['event_data']['v2_id']
+
+            # Get the current time in the specified timezone
+            time_zone = pytz.timezone('America/New_York')
+            now = datetime.now(time_zone)
+            text_schedule_time = now + timedelta(seconds=15)  # Make task slightly in the future
+
+            message = "test!"
+            schedule_text_message(task_id, message, text_schedule_time)
 
     return 'OK', 200
 
@@ -200,6 +389,7 @@ def main(request: Optional[dict[str, Any]] = None) -> str:
 from flask import Request
 from werkzeug.test import EnvironBuilder
 from werkzeug.wrappers import Request as WerkzeugRequest
+
 
 # Define minimal headers (only essential ones)
 headers = {
@@ -219,7 +409,6 @@ builder = EnvironBuilder(
 # Build the environment
 env = builder.get_environ()
 request = Request(env)
-
 
 if __name__ == "__main__":
     main(request)

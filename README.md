@@ -2,9 +2,13 @@
 
 A LLM Integration with your Google Calendar and Todoist to send you relevant reminders (via text message) related your events and tasks. You can customize/slowly accrue the list of reminders you want.
 
+Note: This app requires Pushover, which charges a one-time $5 fee beyond the 30-day trial.
+
+Underlying assumption: the script is called at least one every 30 days, or else the Google Calendar Watcher will expire without getting renewed. If 30 days does pass without calling the script, making/updating a task on TODOist will revive the Calendar watcher.
+
 ## Current TODOs:
-- Either create scheduler for Cloud Function or figure out how to remove expiration on calendar watcher
-- TODOist integration, LLM integration, text message integration
+- Add GCal functionality to send webhook a few hours before events occur
+- LLM integration, text message integration (modify cloud function to detect/handle json with text message data)
 
 ## Installation and Setup
 
@@ -30,7 +34,7 @@ A LLM Integration with your Google Calendar and Todoist to send you relevant rem
  - `item:added`
  - `item:updated`
 5. Click "Activate webhook"
-6. Perform TODOist webhook Authorization procedure
+6. Perform TODOist webhook Authorization procedure (See ["Webhook Activation & Personal Use"](https://developer.todoist.com/sync/v8/#webhooks))
     a. Enter the following string into your browser, replacing the `client_id` with the actual Client ID of your TODOist app (found in your TODOist Developer Console): `https://todoist.com/oauth/authorize?client_id=0123456789abcdef&scope=data:read,data:delete&state=secretstring`
     b. Press "Agree"
     c. This should redirect you to a url containing a `code`. Copy this code.
@@ -41,18 +45,29 @@ A LLM Integration with your Google Calendar and Todoist to send you relevant rem
     -d "client_secret=secret" \
     -d "code=abcdef" \
     -d "redirect_uri=https://www.google.com/"
+    ```
 
 Your TODOist should now be authorized to send webhooks to your Google Cloud function whenever you add or modify a task!
-    ```
+
+
+#### Pushover Setup
+To send life reminders, Pushover is used. Pushover accepts simple HTTP Requests and sends push notifications to a device using the Pushover app.
+1. Download the Pushover mobile app (works on IOS or Android).
+2. In the Pushover App, create an account and take note of your User Key.
+3. Create a Pushover Application from the Pushover [web dashboard](https://pushover.net/apps/build). Take note of the resulting API Token/Key.
 
 
 #### Data File
 - Create a file in the outermost directory called `data.py`
 - Enter this data into `data.py`:
 ```python
+google_cloud_project_id = 'Your Google Cloud Project ID (i.e. `lifeassistant-123456`)'
 calendar_id = 'Your Calendar ID (i.e. 'primary', or 'your_email@gmail.com')'
 cloud_function_address = 'Your Google Cloud Function URL'
 todoist_api_token = 'Your TODOist account API token (see https://todoist.com/help/articles/find-your-api-token-Jpzx9IIlB)'
+todoist_projects = ['0123456789', '9876543210']  # List of project ID's whose tasks you want LifeAssistant to be able to see. You can find your project's ID by opening your TODOist project in the web-version of TODOist and extracting it from the URL.
+pushover_api_token = "Your Pushover Application API Token/Key"
+pushover_user_key = "Your Pushover Account User Key"
 phone_number = 'XXXYYYZZZZ'
 ```
 
