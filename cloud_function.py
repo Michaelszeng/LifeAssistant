@@ -7,9 +7,7 @@ from google.protobuf import timestamp_pb2
 
 from typing import Any, Optional
 from datetime import datetime, timedelta, timezone
-from dateutil import parser
 import http.client, urllib
-import smtplib
 import uuid
 import json
 import os
@@ -23,7 +21,6 @@ DEBUG = 0
 SCOPES = ['https://www.googleapis.com/auth/calendar']
 SERVICE_ACCOUNT_FILE = 'service_account.json'
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = SERVICE_ACCOUNT_FILE
-TEXT_SCHEDULE_FILE = 'scheduled_tasks.json'
 
 # Retrieve service account
 credentials = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
@@ -332,7 +329,10 @@ def main(request: Optional[dict[str, Any]] = None) -> str:
     # First re-establish calendar watcher so that it never expires
     resource_id, channel_id = get_calendar_watcher_data()
     if resource_id and channel_id:  # Stop the old watcher
-        stop_calendar_watcher(resource_id, channel_id)
+        try:
+            stop_calendar_watcher(resource_id, channel_id)
+        except:
+            print("stop_calendar_watcher() failed.")
     # Establish new watcher
     start_calendar_watcher()
 
