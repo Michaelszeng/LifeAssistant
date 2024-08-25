@@ -5,28 +5,25 @@ from google.cloud import firestore
 from google.protobuf import timestamp_pb2
 from huggingface_hub import login, snapshot_download
 import transformers
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from transformers import AutoTokenizer
 from typing import Any, Optional
 from datetime import datetime, timedelta, timezone
-from flask import Request
 import http.client, urllib
 import modal
 import torch
-import textwrap
 import uuid
 import json
 import os
 import pytz
 import time
 
-from data import *
+from data_files.data import *
 
 app = modal.App()
 
 image = (
     modal.Image.debian_slim(python_version="3.10")
-    .pip_install("torch==2.2.1")
-    # TODO: ADD OTHER PIP INSTALLS
+    .pip_install_from_requirements(os.path.join(os.getcwd(), "modal_requirements.txt"))
 )
 
 # Firestore data
@@ -273,7 +270,7 @@ def send_push_notif(message_body, event_id):
 ################################################################################
 ### Modal App
 ################################################################################
-@app.cls(gpu="any", image=image)
+@app.cls(gpu="any", image=image, mounts=[modal.Mount.from_local_dir(os.path.join(os.getcwd(), "data_files"), remote_path="/root/data_files")])
 class Model:
 
     @modal.build()  # add another step to the image build
@@ -292,7 +289,6 @@ class Model:
 
         os.makedirs(MODEL_DIR, exist_ok=True)
         login(token=huggingface_token)
-        snapshot_download("meta-llama/Meta-Llama-3-8B-Instruct", local_dir=MODEL_DIR)
 
         # Download the model snapshot to a specific directory
         self.model_dir = snapshot_download(
@@ -306,7 +302,7 @@ class Model:
         ########################################################################
         # Retrieve service account
         SCOPES = ['https://www.googleapis.com/auth/calendar']
-        SERVICE_ACCOUNT_FILE = 'service_account.json'
+        SERVICE_ACCOUNT_FILE = 'data_files/service_account.json'
         os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = SERVICE_ACCOUNT_FILE
         credentials = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
 

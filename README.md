@@ -8,15 +8,10 @@ Technologies used:
 - Llama 3.1 for natural language analysis of tasks and calendar events
 - Google Cloud Tasks for scheduled notifications
 - Google Calendar API to read calendar events and changes
-- TODOist API to read tasks and changes
+- Todoist API to read tasks and changes
 - Pushover to send push notifications to a mobile device
 
 Note: LifeAssistant requires Pushover, which charges a one-time $5 fee beyond the 30-day trial.
-
-
-## Current TODOs:
-- Add GCal functionality to send webhook a few hours before events occur
-- LLM integration, text message integration (modify cloud function to detect/handle json with text message data)
 
 
 #### Modal Installation and Setup
@@ -45,19 +40,19 @@ Note: LifeAssistant requires Pushover, which charges a one-time $5 fee beyond th
 LifeAssistant will now be able to store persistant data (such as Calendar sync tokens, a queue of scheduled notifications, etc.) in documents in Google Firestore!
 
 
-#### TODOist App Setup
-1. Log into TODOist and create a new app in your TODOist Developer Console (https://developer.todoist.com/appconsole.html)
+#### Todoist App Setup
+1. Log into Todoist and create a new app in your Todoist Developer Console (https://developer.todoist.com/appconsole.html)
 2. Set "OAuth redirect URL" to `https://todoist.com/oauth/authorize`
 3. Set "Webhook callback URL" to your Google Cloud Function URL
 4. Add the following items to "Watched Events":
  - `item:added`
  - `item:updated`
 5. Click "Activate webhook"
-6. Perform TODOist webhook Authorization procedure (See ["Webhook Activation & Personal Use"](https://developer.todoist.com/sync/v8/#webhooks))
-    a. Enter the following string into your browser, replacing the `client_id` with the actual Client ID of your TODOist app (found in your TODOist Developer Console): `https://todoist.com/oauth/authorize?client_id=0123456789abcdef&scope=data:read,data:delete&state=secretstring`
+6. Perform Todoist webhook Authorization procedure (See ["Webhook Activation & Personal Use"](https://developer.todoist.com/sync/v8/#webhooks))
+    a. Enter the following string into your browser, replacing the `client_id` with the actual Client ID of your Todoist app (found in your Todoist Developer Console): `https://todoist.com/oauth/authorize?client_id=0123456789abcdef&scope=data:read,data:delete&state=secretstring`
     b. Press "Agree"
     c. This should redirect you to a url containing a `code`. Copy this code.
-    d. In a command line, run this command, replacing the `client_id` and `client_secret` with their respective values from your TODOist Developer Console and replacing `code` with the code you got in step 6. c.:
+    d. In a command line, run this command, replacing the `client_id` and `client_secret` with their respective values from your Todoist Developer Console and replacing `code` with the code you got in step 6. c.:
     ```bash
     $ curl "https://todoist.com/oauth/access_token" \
     -d "client_id=0123456789abcdef" \
@@ -66,7 +61,7 @@ LifeAssistant will now be able to store persistant data (such as Calendar sync t
     -d "redirect_uri=https://www.google.com/"
     ```
 
-Your TODOist should now be authorized to send webhooks to your Google Cloud function whenever you add or modify a task!
+Your Todoist should now be authorized to send webhooks to your Google Cloud function whenever you add or modify a task!
 
 
 #### Pushover Setup
@@ -90,8 +85,8 @@ LifeAssistant utilizes Meta AI's pre-trained Meta-Llama-3-8B-Instruct model to a
 google_cloud_project_id = 'Your Google Cloud Project ID (i.e. `lifeassistant-123456`)'
 calendar_id = 'Your Calendar ID (i.e. 'primary', or 'your_email@gmail.com')'
 cloud_function_address = 'Your Google Cloud Function URL'
-todoist_api_token = 'Your TODOist account API token (see https://todoist.com/help/articles/find-your-api-token-Jpzx9IIlB)'
-todoist_projects = ['0123456789', '9876543210']  # List of project ID's whose tasks you want LifeAssistant to be able to see. You can find your project's ID by opening your TODOist project in the web-version of TODOist and extracting it from the URL.
+todoist_api_token = 'Your Todoist account API token (see https://todoist.com/help/articles/find-your-api-token-Jpzx9IIlB)'
+todoist_projects = ['0123456789', '9876543210']  # List of project ID's whose tasks you want LifeAssistant to be able to see. You can find your project's ID by opening your Todoist project in the web-version of Todoist and extracting it from the URL.
 pushover_api_token = "Your Pushover Application API Token/Key"
 pushover_user_key = "Your Pushover Account User Key"
 huggingface_token = "Your HuggingFace token"
@@ -102,7 +97,7 @@ You can find your calendar ID by going to your Google Calendar, clicking on the 
 
 ### Disclaimers:
 
-One underlying assumption is that the Modal function is invoked at least once every 30 days, or else the Google Calendar Watcher will expire without getting renewed. If 30 days does pass without the function being invoked, making or updating a task in TODOist (or invoking the function in some other way) will revive the Calendar watcher.
+One underlying assumption is that the Modal function is invoked at least once every 30 days, or else the Google Calendar Watcher will expire without getting renewed. If 30 days does pass without the function being invoked, making or updating a task in Todoist (or invoking the function in some other way) will revive the Calendar watcher.
 
 
 ## Credits

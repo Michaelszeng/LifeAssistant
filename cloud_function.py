@@ -14,7 +14,7 @@ import os
 import pytz
 import time
 
-from data import *
+from data_files.data import *
 
 DEBUG = 0
 

@@ -1,5 +1,5 @@
 from huggingface_hub import login, snapshot_download
-from data import huggingface_token
+from data_files.data import huggingface_token
 login(token=huggingface_token)
 
 import os
@@ -43,7 +43,15 @@ def llm_inference(input_text ,max_length=512):
         wrapped_text = '\n'.join(wrapped_lines)  # Join the wrapped lines back together using newline characters
         return wrapped_text
     
-    system_prompt="You are a helpful assistant called Llama-3. Write out your reasoning step-by-step to be sure you get the right answers!"
+    system_prompt="""
+        You are a highly selective automated reminder system. Your task is to evaluate the relevance of an event or task against a list of 
+        reminder items. Only generate a reminder if there is a clear and direct connection between the event or task and the reminder items. 
+        Respond with 'True/False: "Reminder text"', where 'True' indicates a valid reminder, and 'False' indicates no relevance. Ensure 
+        reminders are concise (up to 12 words) and optimistic/exciting. If uncertain, default to 'False' with an empty reminder text.
+    """
+
+    system_prompt = system_prompt.replace('\n', '')
+
     messages = [
         {
             "role": "system",
@@ -71,16 +79,38 @@ def llm_inference(input_text ,max_length=512):
         prompt,
         max_new_tokens=max_length,
         eos_token_id=terminators,
-        do_sample=True,  # Probabilistically sample output
-        temperature=0.0,
-        top_p=0.9,
+        do_sample=False,  # Deterministic output
     )
 
     text = outputs[0]["generated_text"][len(prompt):]
     wrapped_text = wrap_text(text)
+    print(input_text)
+    print()
     print(wrapped_text)
+    print("\n-----------------------------------------------------------------------------------------------------------------\n")
 
     return wrapped_text
 
 
-llm_inference('What is 1+1?', max_length=100)
+from data_files.reminders import *
+ordered_reminders = "\n".join(f"{i+1}. {reminder}" for i, reminder in enumerate(reminders))
+
+llm_inference(f"""Here is the task or event name: {"6.1210 Final"}.\n\nHere is a list of things I would like you to remind me about: \n{ordered_reminders}\n\nOtherwise, do not write a reminder at all.""", max_length=100)
+
+llm_inference(f"""Here is the task or event name: {"Tennis with Sam"}.\n\nHere is a list of things I would like you to remind me about: \n{ordered_reminders}\n\nOtherwise, do not write a reminder at all.""", max_length=100)
+
+llm_inference(f"""Here is the task or event name: {"UROP Payroll"}.\n\nHere is a list of things I would like you to remind me about: \n{ordered_reminders}\n\nOtherwise, do not write a reminder at all.""", max_length=100)
+
+llm_inference(f"""Here is the task or event name: {"Robotics @ MIT Seminar"}.\n\nHere is a list of things I would like you to remind me about: \n{ordered_reminders}\n\nOtherwise, do not write a reminder at all.""", max_length=100)
+
+llm_inference(f"""Here is the task or event name: {"Deal with house expenses"}.\n\nHere is a list of things I would like you to remind me about: \n{ordered_reminders}\n\nOtherwise, do not write a reminder at all.""", max_length=100)
+
+llm_inference(f"""Here is the task or event name: {"free time: supercloud tutorial"}.\n\nHere is a list of things I would like you to remind me about: \n{ordered_reminders}\n\nOtherwise, do not write a reminder at all.""", max_length=100)
+
+llm_inference(f"""Here is the task or event name: {"Book flight to SD"}.\n\nHere is a list of things I would like you to remind me about: \n{ordered_reminders}\n\nOtherwise, do not write a reminder at all.""", max_length=100)
+
+llm_inference(f"""Here is the task or event name: {"Flight to SAN"}.\n\nHere is a list of things I would like you to remind me about: \n{ordered_reminders}\n\nOtherwise, do not write a reminder at all.""", max_length=100)
+
+llm_inference(f"""Here is the task or event name: {"Flight to BOS"}.\n\nHere is a list of things I would like you to remind me about: \n{ordered_reminders}\n\nOtherwise, do not write a reminder at all.""", max_length=100)
+
+llm_inference(f"""Here is the task or event name: {"Get Blood Test"}.\n\nHere is a list of things I would like you to remind me about: \n{ordered_reminders}\n\nOtherwise, do not write a reminder at all.""", max_length=100)
