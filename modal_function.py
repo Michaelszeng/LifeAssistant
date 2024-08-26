@@ -372,98 +372,97 @@ class Model:
         )
 
 
-# @app.local_entrypoint()  # Use this instead of the below during development to run the function automatically, not as a web endpoint
-@app.function()
-@modal.web_endpoint(method="POST", label="webhook")
-def web_endpoint(request: dict) -> str:
-    """
-    Runs whenever the HTTP endpoint is used.
-    """
-    # Initialize Firestore
-    print("START WEB ENDPOINT.")
+    # @app.local_entrypoint()  # Use this instead of the below during development to run the function automatically, not as a web endpoint
+    @modal.web_endpoint(method="POST", label="webhook")
+    def web_endpoint(self, data: dict):
+        """
+        Runs whenever the HTTP endpoint is used.
 
-    service = build_calendar()
-    db = firestore.Client()
-    sync_token = get_token(db)
-    
-    # First re-establish calendar watcher so that it never expires
-    resource_id, channel_id = get_calendar_watcher_data(db)
-    if resource_id and channel_id:  # Stop the old watcher
-        try:
-            stop_calendar_watcher(service, resource_id, channel_id)
-        except:
-            print("stop_calendar_watcher() failed.")
-    # Establish new watcher
-    start_calendar_watcher(db, service)
+        data is a dictionary containing json data in POST request.
+        """
+        # Initialize Firestore
+        print("START WEB ENDPOINT.")
 
-    print(request)
-    print(type(request))
-    # data = request.json
-    data = request
+        service = build_calendar()
+        db = firestore.Client()
+        sync_token = get_token(db)
+        
+        # First re-establish calendar watcher so that it never expires
+        resource_id, channel_id = get_calendar_watcher_data(db)
+        if resource_id and channel_id:  # Stop the old watcher
+            try:
+                stop_calendar_watcher(service, resource_id, channel_id)
+            except:
+                print("stop_calendar_watcher() failed.")
+        # Establish new watcher
+        start_calendar_watcher(db, service)
 
-    if not data:  # GCal event updated
-        # Retrieve updated events
-        events_result = service.events().list(
-            calendarId=calendar_id,
-            maxResults=2500,  # max of 2500
-            singleEvents=True,
-            syncToken=sync_token,
-        ).execute()
+        if not data:  # GCal event updated
+            print("Received Google Calendar update.")
+            # Retrieve updated events
+            events_result = service.events().list(
+                calendarId=calendar_id,
+                maxResults=2500,  # max of 2500
+                singleEvents=True,
+                syncToken=sync_token,
+            ).execute()
 
-        events = events_result.get('items', [])
-        print(f'Retrieved {len(events)} events')
+            print("test")
 
-        # Process events
-        for event in events:
-            if event.get('status', "") == "confirmed":  # Event made or modified
-                print('GCal event made or modified:', event)
-                event_id = event.get('id')
+            events = events_result.get('items', [])
+            print(f'Retrieved {len(events)} events')
 
-                # In case this event has been modified instead of created, attempt to cancel its associated text message.
-                # If this event is new, cancel_text_message() will fail gracefully
-                cancel_text_message(db, event_id)
+            # Process events
+            for event in events:
+                if event.get('status', "") == "confirmed":  # Event made or modified
+                    print('GCal event made or modified:', event)
+                    event_id = event.get('id')
 
-                # Extract event start datetime
-                date_time_str = event['dateTime']
-                time_zone_str = event['timeZone']
-                naive_datetime = datetime.fromisoformat(date_time_str)
-                time_zone = pytz.timezone(time_zone_str)
-                event_start_time = time_zone.localize(naive_datetime)
-                text_schedule_time = event_start_time - timedelta(hours=4)  # Ready to be passed to schedule_text_message()
+                    # In case this event has been modified instead of created, attempt to cancel its associated text message.
+                    # If this event is new, cancel_text_message() will fail gracefully
+                    cancel_text_message(db, event_id)
+
+                    # Extract event start datetime
+                    date_time_str = event['dateTime']
+                    time_zone_str = event['timeZone']
+                    naive_datetime = datetime.fromisoformat(date_time_str)
+                    time_zone = pytz.timezone(time_zone_str)
+                    event_start_time = time_zone.localize(naive_datetime)
+                    text_schedule_time = event_start_time - timedelta(hours=4)  # Ready to be passed to schedule_text_message()
+
+                    message = "test!"
+                    schedule_text_message(db, event_id, message, text_schedule_time)
+
+                elif event.get('status', "") == "cancelled":  # Event made or modified
+                    print('GCal event cancelled:', event)
+                    event_id = event.get('id')
+
+                    cancel_text_message(db, event_id)
+
+            # Update sync token
+            sync_token = events_result.get('nextSyncToken')
+            print('New sync token:', sync_token)
+
+            store_token(db, sync_token)
+
+        else:  
+            if 'text_message' in data:  # Text message task
+                send_push_notif(db, data['message'], data['event_id'])
+
+            # TODOist task update
+            elif 'event_name' in data and data['event_data']['project_id'] in todoist_projects and not data['event_data']['is_deleted'] and (data['event_name'] == 'item:added' or data['event_name'] == 'item:updated'):
+                # Process the new task
+                print(f"TODOist task added/updated: {data['event_data']['content']}")
+                
+                task_id = data['event_data']['v2_id']
+
+                # Get the current time in the specified timezone
+                time_zone = pytz.timezone('America/New_York')
+                now = datetime.now(time_zone)
+                text_schedule_time = now + timedelta(seconds=15)  # Make task scheduled slightly in the future
 
                 message = "test!"
-                schedule_text_message(db, event_id, message, text_schedule_time)
+                schedule_text_message(db, task_id, message, text_schedule_time)
 
-            elif event.get('status', "") == "cancelled":  # Event made or modified
-                print('GCal event cancelled:', event)
-                event_id = event.get('id')
-
-                cancel_text_message(db, event_id)
-
-        # Update sync token
-        sync_token = events_result.get('nextSyncToken')
-        print('New sync token:', sync_token)
-
-        store_token(db, sync_token)
-
-    else:  
-        if 'text_message' in data:  # Text message task
-            send_push_notif(db, data['message'], data['event_id'])
-
-        # TODOist task update
-        elif 'event_name' in data and data['event_data']['project_id'] in todoist_projects and not data['event_data']['is_deleted'] and (data['event_name'] == 'item:added' or data['event_name'] == 'item:updated'):
-            # Process the new task
-            print(f"TODOist task added/updated: {data['event_data']['content']}")
-            
-            task_id = data['event_data']['v2_id']
-
-            # Get the current time in the specified timezone
-            time_zone = pytz.timezone('America/New_York')
-            now = datetime.now(time_zone)
-            text_schedule_time = now + timedelta(seconds=15)  # Make task scheduled slightly in the future
-
-            message = "test!"
-            schedule_text_message(db, task_id, message, text_schedule_time)
-
-    return 'OK', 200
+        return 'OK', 200
 
