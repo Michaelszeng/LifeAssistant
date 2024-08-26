@@ -1,3 +1,4 @@
+accelerate
 aiohappyeyeballs
 aiohttp
 aiosignal
@@ -5,6 +6,7 @@ aiostream
 annotated-types
 anyio
 attrs
+bitsandbytes
 cachetools
 certifi
 charset-normalizer

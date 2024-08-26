@@ -418,7 +418,6 @@ from flask import Request
 from werkzeug.test import EnvironBuilder
 from werkzeug.wrappers import Request as WerkzeugRequest
 
-
 # Define minimal headers (only essential ones)
 headers = {
     "Host": "localhost",
