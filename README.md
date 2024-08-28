@@ -43,7 +43,7 @@ LifeAssistant will now be able to store persistant data (such as Calendar sync t
 #### Todoist App Setup
 1. Log into Todoist and create a new app in your Todoist Developer Console (https://developer.todoist.com/appconsole.html)
 2. Set "OAuth redirect URL" to `https://todoist.com/oauth/authorize`
-3. Set "Webhook callback URL" to your Google Cloud Function URL
+3. Set "Webhook callback URL" to your Modal Function URL
 4. Add the following items to "Watched Events":
  - `item:added`
  - `item:updated`
@@ -61,7 +61,7 @@ LifeAssistant will now be able to store persistant data (such as Calendar sync t
     -d "redirect_uri=https://www.google.com/"
     ```
 
-Your Todoist should now be authorized to send webhooks to your Google Cloud function whenever you add or modify a task!
+Your Todoist should now be authorized to send webhooks to your Modal function whenever you add or modify a task!
 
 
 #### Pushover Setup
@@ -84,7 +84,7 @@ LifeAssistant utilizes Meta AI's pre-trained Meta-Llama-3-8B-Instruct model to a
 ```python
 google_cloud_project_id = 'Your Google Cloud Project ID (i.e. `lifeassistant-123456`)'
 calendar_id = 'Your Calendar ID (i.e. 'primary', or 'your_email@gmail.com')'
-cloud_function_address = 'Your Google Cloud Function URL'
+modal_function_address = 'Your Modal Function URL'
 todoist_api_token = 'Your Todoist account API token (see https://todoist.com/help/articles/find-your-api-token-Jpzx9IIlB)'
 todoist_projects = ['0123456789', '9876543210']  # List of project ID's whose tasks you want LifeAssistant to be able to see. You can find your project's ID by opening your Todoist project in the web-version of Todoist and extracting it from the URL.
 pushover_api_token = "Your Pushover Application API Token/Key"
@@ -94,6 +94,12 @@ huggingface_token = "Your HuggingFace token"
 
 You can find your calendar ID by going to your Google Calendar, clicking on the three dots next to your calendar in the bottom left, --> "Settings and Sharing" --> "Calendar ID".
 
+
+### Common Links to Monitor LifeAssistant Status and Credit Usage
+- [Modal Dashboard for Cloud Function/Compute/Storage Usage](https://modal.com/apps/)
+- [Google Cloud Tasks Queue](https://console.cloud.google.com/cloudtasks)
+- [Google Cloud Firestore File Storage](https://console.cloud.google.com/firestore/databases)
+- [Todoist Dashboard](https://developer.todoist.com/appconsole.html)
 
 ### Disclaimers:
 

@@ -7,6 +7,7 @@ from google.cloud import tasks_v2
 from google.cloud import firestore
 from google.protobuf import timestamp_pb2
 from datetime import datetime, timedelta, timezone
+from typing import Any, Optional
 import http.client, urllib
 import modal
 import torch
@@ -159,7 +160,7 @@ def start_calendar_watcher(db, service):
     request_body = {
         'id': channel_id,  # A unique string ID for this channel
         'type': 'web_hook',         # Type of delivery method
-        'address': cloud_function_address,  # The Google Cloud Function URL
+        'address': modal_function_address,  # The Google Cloud Function URL
         'expiration': 1893456000000,  # Basically will cap at Google's 30 day limit.
     }
 
@@ -195,7 +196,7 @@ def schedule_text_message(db, event_id, message, schedule_time):
     task = {
         'http_request': {  
             'http_method': tasks_v2.HttpMethod.POST,
-            'url': cloud_function_address,  
+            'url': modal_function_address,  
             'headers': {'Content-Type': 'application/json'},
             'body': json.dumps(payload).encode()
         }
@@ -374,14 +375,14 @@ class Model:
 
     # @app.local_entrypoint()  # Use this instead of the below during development to run the function automatically, not as a web endpoint
     @modal.web_endpoint(method="POST", label="webhook")
-    def web_endpoint(self, data: dict):
+    def web_endpoint(self, data: Optional[dict[str, Any]] = None):
         """
         Runs whenever the HTTP endpoint is used.
 
         data is a dictionary containing json data in POST request.
         """
-        # Initialize Firestore
         print("START WEB ENDPOINT.")
+        print("Received data:", data)
 
         service = build_calendar()
         db = firestore.Client()
@@ -445,7 +446,7 @@ class Model:
 
             store_token(db, sync_token)
 
-        else:  
+        else:
             if 'text_message' in data:  # Text message task
                 send_push_notif(db, data['message'], data['event_id'])
 
@@ -464,5 +465,7 @@ class Model:
                 message = "test!"
                 schedule_text_message(db, task_id, message, text_schedule_time)
 
-        return 'OK', 200
+            else:
+                print("Request JSON is not None but is also neither a text message nor a Todoist task.")
 
+        return 'OK', 200
