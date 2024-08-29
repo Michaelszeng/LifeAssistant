@@ -237,7 +237,7 @@ def cancel_text_message(db, event_id):
         client.delete_task(name=task_name)
         print(f'Task {task_name} deleted successfully')
     except Exception as e:
-        print(f"Error deleting task {task_name}: {e}")
+        print(f"Warning: deleting task {task_name} failed. Returning gracefully. Error: {e}. ")
         return
 
 
@@ -318,7 +318,7 @@ class Model:
         ########################################################################
         ### Get Initial Sync with Calendar
         ########################################################################
-        sync_token, date_stored = get_token(db)
+        sync_token, _ = get_token(db)
         page_token = None
 
         # deal with pagination of events; each page either has a page token or (is the last page and) has the sync token
@@ -382,11 +382,11 @@ class Model:
         data is a dictionary containing json data in POST request.
         """
         print("START WEB ENDPOINT.")
-        print("Received data:", data)
+        print(f"\nReceived data: {data}\n")
 
         service = build_calendar()
         db = firestore.Client()
-        sync_token = get_token(db)
+        sync_token, _ = get_token(db)
         
         # First re-establish calendar watcher so that it never expires
         resource_id, channel_id = get_calendar_watcher_data(db)
@@ -424,11 +424,15 @@ class Model:
                     cancel_text_message(db, event_id)
 
                     # Extract event start datetime
-                    date_time_str = event['dateTime']
-                    time_zone_str = event['timeZone']
+                    date_time_str = event['start']['dateTime']
+                    time_zone_str = event['start']['timeZone']
                     naive_datetime = datetime.fromisoformat(date_time_str)
                     time_zone = pytz.timezone(time_zone_str)
-                    event_start_time = time_zone.localize(naive_datetime)
+                    # Check if the datetime is naive (without timezone info)
+                    if naive_datetime.tzinfo is None:
+                        event_start_time = time_zone.localize(naive_datetime)
+                    else:
+                        event_start_time = naive_datetime
                     text_schedule_time = event_start_time - timedelta(hours=4)  # Ready to be passed to schedule_text_message()
 
                     message = "test!"
