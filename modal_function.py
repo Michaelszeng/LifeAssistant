@@ -121,7 +121,7 @@ def remove_scheduled_task(db, event_id):
             break
 
     if not task_to_delete:
-        print(f"No task found for event_id: {event_id}")
+        # print(f"No task found for event_id: {event_id}")
         return None
 
     task_name = task_to_delete['task_name']
@@ -199,7 +199,7 @@ def schedule_text_message(db, event_id, message, schedule_time):
             'url': modal_function_address,  
             'headers': {'Content-Type': 'application/json'},
             'body': json.dumps(payload).encode()
-        }
+        },
     }
 
     # Convert the schedule_time to a timestamp
@@ -319,30 +319,40 @@ class Model:
         ### Get Initial Sync with Calendar
         ########################################################################
         sync_token, _ = get_token(db)
+        print(f"Sync token retrieved from Google Firestore: {sync_token}")
         page_token = None
 
         # deal with pagination of events; each page either has a page token or (is the last page and) has the sync token
-        time_max = datetime.now(timezone.utc) + timedelta(days=2)
-        time_max = datetime.strftime(time_max, "%Y-%m-%dT%H:%M:%S%z")
         events_result = (
-            service.events()
-            .list(calendarId=calendar_id, singleEvents=True, timeMax=str(time_max))
-            .execute()
-        )
+                service.events()
+                .list(
+                    calendarId=calendar_id,
+                    singleEvents=False,  # do not repeat repeated occurences
+                    maxResults=2500,  # max of 2500
+                    syncToken=sync_token,
+                )
+                .execute()
+            )
+        events = events_result.get('items', [])
+        print(f'Retrieved {len(events)} events')
+        sync_token = events_result.get("nextSyncToken", None)
+        print(f"Sync token after first Calendar read: {sync_token}")
         while sync_token is None:
             nextPageToken = events_result.get("nextPageToken", None)
             events_result = (
                 service.events()
                 .list(
                     calendarId=calendar_id,
-                    singleEvents=True,
+                    singleEvents=False,  # do not repeat repeated occurences
                     pageToken=nextPageToken,
-                    timeMax=str(time_max),
+                    syncToken=sync_token,
                     maxResults=2500,  # max of 2500
                 )
                 .execute()
             )
+            events = events_result.get('items', [])
             sync_token = events_result.get("nextSyncToken", None)
+            print(f'Retrieved {len(events)} events; nextSyncToken: {sync_token}')
 
         print('Initial sync token:', sync_token)
 
@@ -359,9 +369,7 @@ class Model:
         print("RUNNING SETUP.")
 
         torch.set_default_device('cuda')
-
         self.tokenizer = AutoTokenizer.from_pretrained('/root/llama')
-
         self.pipe = transformers.pipeline(
             "text-generation",
             model="/root/llama",
@@ -372,9 +380,21 @@ class Model:
             },
         )
 
+        # First re-establish calendar watcher so that it never expires
+        service = build_calendar()
+        db = firestore.Client()
+        resource_id, channel_id = get_calendar_watcher_data(db)
+        if resource_id and channel_id:  # Stop the old watcher
+            try:
+                stop_calendar_watcher(service, resource_id, channel_id)
+            except:
+                print("stop_calendar_watcher() failed.")
+        # Establish new watcher
+        start_calendar_watcher(db, service)
+
 
     # @app.local_entrypoint()  # Use this instead of the below during development to run the function automatically, not as a web endpoint
-    @modal.web_endpoint(method="POST", label="webhook")
+    @modal.web_endpoint(method="POST", label="webhook-v2")
     def web_endpoint(self, data: Optional[dict[str, Any]] = None):
         """
         Runs whenever the HTTP endpoint is used.
@@ -387,16 +407,6 @@ class Model:
         service = build_calendar()
         db = firestore.Client()
         sync_token, _ = get_token(db)
-        
-        # First re-establish calendar watcher so that it never expires
-        resource_id, channel_id = get_calendar_watcher_data(db)
-        if resource_id and channel_id:  # Stop the old watcher
-            try:
-                stop_calendar_watcher(service, resource_id, channel_id)
-            except:
-                print("stop_calendar_watcher() failed.")
-        # Establish new watcher
-        start_calendar_watcher(db, service)
 
         if not data:  # GCal event updated
             print("Received Google Calendar update.")
@@ -404,11 +414,9 @@ class Model:
             events_result = service.events().list(
                 calendarId=calendar_id,
                 maxResults=2500,  # max of 2500
-                singleEvents=True,
+                singleEvents=False,  # do not repeat repeated occurences
                 syncToken=sync_token,
             ).execute()
-
-            print("test")
 
             events = events_result.get('items', [])
             print(f'Retrieved {len(events)} events')
@@ -435,7 +443,7 @@ class Model:
                         event_start_time = naive_datetime
                     text_schedule_time = event_start_time - timedelta(hours=4)  # Ready to be passed to schedule_text_message()
 
-                    message = "test!"
+                    message = "scheduled test!"
                     schedule_text_message(db, event_id, message, text_schedule_time)
 
                 elif event.get('status', "") == "cancelled":  # Event made or modified
@@ -471,5 +479,3 @@ class Model:
 
             else:
                 print("Request JSON is not None but is also neither a text message nor a Todoist task.")
-
-        return 'OK', 200

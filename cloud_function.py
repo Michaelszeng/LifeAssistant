@@ -418,33 +418,14 @@ from flask import Request
 from werkzeug.test import EnvironBuilder
 from werkzeug.wrappers import Request as WerkzeugRequest
 
+# Define minimal headers (only essential ones)
 headers = {
-    "Host": "us-central1-lifeassistant-431806.cloudfunctions.net",
+    "Host": "localhost",
     "Content-Type": "application/json",
-    "X-Todoist-Hmac-Sha256": "JKcXNUitKqdupYGC8Pu2dumdhuH0reZLUNZHMhni2oc=",
-    "X-Todoist-Delivery-Id": "4441867b-9d2f-4f48-b0dc-ecb81952e8e6",
-    "X-App-Id": "28901",
-    "User-Agent": "Todoist-Webhooks",
-    "Content-Length": "827",
-    "X-Cloud-Trace-Context": "6c429ee6d1934d5005a1de407e9f09e5/4055164024086729728;o=1",
-    "Traceparent": "00-6c429ee6d1934d5005a1de407e9f09e5-3846d631d9a21400-01",
-    "X-Forwarded-For": "44.223.67.152",
-    "X-Forwarded-Proto": "https",
-    "Forwarded": 'for="44.223.67.152";proto=https',
-    "Accept-Encoding": "gzip",
-    "Function-Execution-Id": "chMnNQB6Shxp"
 }
 
-body = b'{"event_data":{"added_at":"2024-08-11T18:06:36.164542Z","added_by_uid":"28742631","assigned_by_uid":null,"checked":false,"child_order":13,"collapsed":false,"completed_at":null,"content":"tset4567","description":"","due":null,"duration":null,"id":"8285513154","is_deleted":false,"labels":[],"parent_id":null,"priority":1,"project_id":"2313268935","responsible_uid":null,"section_id":null,"sync_id":null,"updated_at":"2024-08-11T18:06:36Z","url":"https://todoist.com/app/task/8285513154","user_id":"28742631","v2_id":"6VxF4m2C5QR7rcWj","v2_parent_id":null,"v2_project_id":"6PfvVfWVvv2Mgx9C","v2_section_id":null},"event_name":"item:added","initiator":{"email":"michaelszeng@gmail.com","full_name":"Michael Zeng","id":"28742631","image_id":"25234c155f3040a39c96e086eea87a24","is_premium":false},"user_id":"28742631","version":"9"}'
-
-# # Define minimal headers (only essential ones)
-# headers = {
-#     "Host": "localhost",
-#     "Content-Type": "application/json",
-# }
-
-# # Define an empty JSON body
-# body = b'{}'
+# Define an empty JSON body
+body = b'{}'
 
 # Create the environment builder
 builder = EnvironBuilder(
