@@ -2,7 +2,7 @@
 
 A LLM Integration with your Google Calendar and Todoist to send you relevant reminders (via text message) related your events and tasks. You can customize/slowly accrue the list of reminders you want.
 
-![Example of reminder notifications](demo.png)
+<img src="demo.png" alt="Example of reminder notifications" style="width:40%;">
 
 Technologies used:
 - Modal for severless hosting of a function

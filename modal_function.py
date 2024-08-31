@@ -24,7 +24,7 @@ app = modal.App()
 
 image = (
     modal.Image.debian_slim(python_version="3.10")
-    .pip_install_from_requirements(os.path.join(os.getcwd(), "modal_requirements.txt"))
+    .pip_install_from_requirements(os.path.join(os.getcwd(), "requirements.txt"))
 )
 
 # Firestore data
