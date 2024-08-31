@@ -315,10 +315,10 @@ def llm_inference(pipe, summary, description, reminders, max_length=100):
     output_text = outputs[0]["generated_text"][len(prompt):]
     print(input_text)
     print()
-    print(f"{output_text.split(":")[0]}: {output_text.split(":")[-1][2:-1]}")
+    print(f"{output_text.split(':')[0]}: {output_text.split(':')[-1][2:-1]}")
     print("\n-----------------------------------------------------------------------------------------------------------------\n")
 
-    return output_text.split(":")[-1][2:-1]
+    return "true" in output_text.split(':')[0].lower(), output_text.split(":")[-1][2:-1]
 
 
 ################################################################################
@@ -511,8 +511,9 @@ class Model:
                         event_start_time = naive_datetime
                     text_schedule_time = event_start_time - timedelta(hours=4)
 
-                    message = llm_inference(self.pipe, event.get("summary"), event.get("description"), build_reminders_string())
-                    schedule_text_message(db, event_id, message, text_schedule_time)
+                    remind_bool, message = llm_inference(self.pipe, event.get("summary"), event.get("description"), build_reminders_string())
+                    if remind_bool:
+                        schedule_text_message(db, task_id, message, text_schedule_time)
 
                 elif event.get('status', "") == "cancelled":  # Event made or modified
                     print('GCal event cancelled:', event)
@@ -542,8 +543,9 @@ class Model:
                 now = datetime.now(time_zone)
                 text_schedule_time = now + timedelta(seconds=15)  # Make task scheduled slightly in the future
                 
-                message = llm_inference(self.pipe, data['event_data']['content'], data['event_data']['description'], build_reminders_string())
-                schedule_text_message(db, task_id, message, text_schedule_time)
+                remind_bool, message = llm_inference(self.pipe, data['event_data']['content'], data['event_data']['description'], build_reminders_string())
+                if remind_bool:
+                    schedule_text_message(db, task_id, message, text_schedule_time)
 
             else:
                 print("Request JSON is not None but is also neither a text message nor a Todoist task.")

@@ -2,6 +2,8 @@
 
 A LLM Integration with your Google Calendar and Todoist to send you relevant reminders (via text message) related your events and tasks. You can customize/slowly accrue the list of reminders you want.
 
+![Example of reminder notifications](demo.png)
+
 Technologies used:
 - Modal for severless hosting of a function
 - Google Cloud Firestore for storage of persistent data for the Modal function
@@ -112,17 +114,19 @@ huggingface_token = "Your HuggingFace token"
 You can find your calendar ID by going to your Google Calendar, clicking on the three dots next to your calendar in the bottom left, --> "Settings and Sharing" --> "Calendar ID".
 
 
-#### `reminders.py`
-Use natural language to tell LifeAssistant what to remind you about. Compile a python list of reminders you want in `reminders.py`.
+#### Reminders
+Use natural language to tell LifeAssistant what to remind you about. Reminders are compiled in the Modal web dashboard for ease of access. To add reminders, go to [your Modal Dashboard](https://modal.com/secrets/), press "Create new secret", select "Custom" for the type of secret, add a new key-value pair for each reminder. Every key should be of the format "rX_...", where "X" is a unique number (i.e. 0, 1, 2, etc.) and "..." can be any string (containing only numbers, letters, and underscores) that helps you remember what the reminder is. Then name your secret "reminders", and press "Create" to finish creating the secret. 
 
-Here are a few examples:
+![Demo of creating reminders/secrets in Modal dashboard](demo-adding-reminders.png)
+
+You can modify this secret to add or remove reminders at any time.
+
+A few examples of what I remind myself to do:
 ```
-reminders = [
-    "If I am going to book a flight, please remind me to try to select a window seat on the left side of the plane. Note that I do not need this reminder if I have already booked the flight and am just taking the flight.",
-    "If I am going to have an exam, midterm, or final, please remind me to refill my water bottle and pack tissue paper.",
-    "If I am going to fly home to San Diego, remind me to put on a jacket when I arrive in San Diego so I don't get sick.",
-    "If I am going to get a blood test, remind me to print out the lab order beforehand.",
-]
+"If I am going to book a flight, please remind me to try to select a window seat on the left side of the plane. Note that I do not need this reminder if I have already booked the flight and am just taking the flight.",
+"If I am going to have an exam, midterm, or final, please remind me to refill my water bottle and pack tissue paper.",
+"If I am going to fly home to San Diego, remind me to put on a jacket when I arrive in San Diego so I don't get sick.",
+"If I am going to get a blood test, remind me to print out the lab order beforehand.",
 ```
 
 
