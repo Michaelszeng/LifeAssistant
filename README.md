@@ -2,12 +2,12 @@
 
 A LLM Integration with your Google Calendar and Todoist to send you relevant reminders (via text message) related your events and tasks. You can customize/slowly accrue the list of reminders you want.
 
-<img src="demo.png" alt="Example of reminder notifications" style="width:40%;">
+<img src="demo.png" alt="Example of reminder notifications" style="width:30%;">
 
-Technologies used:
-- Modal for severless hosting of a function
+#### Technologies used:
+- Modal for severless hosting of a function with GPU access
 - Google Cloud Firestore for storage of persistent data for the Modal function
-- Llama 3.1 for natural language analysis of tasks and calendar events
+- Llama 3.1 running "locally" for natural language analysis of tasks and calendar events and generation of reminders
 - Google Cloud Tasks for scheduled notifications
 - Google Calendar API to read calendar events and changes
 - Todoist API to read tasks and changes

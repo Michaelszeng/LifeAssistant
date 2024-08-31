@@ -103,7 +103,7 @@ def start_calendar_watcher(db, service):
     request_body = {
         'id': channel_id,  # A unique string ID for this channel
         'type': 'web_hook',         # Type of delivery method
-        'address': modal_function_address,  # The Google Cloud Function URL
+        'address': modal_function_address,  # The Cloud Function URL
         'expiration': 1893456000000,  # Basically will cap at Google's 30 day limit.
     }
 
@@ -456,14 +456,9 @@ class Model:
             Helper function to retrieve reminders list from Modal secrets and compile into a string to feed to LLM
             """
             result = []
-            i = 0
-            while True:  # Loop to fetch all environment variables r0, r1, r2, etc.
-                try:
-                    value = os.environ[f"r{i}"]
+            for key, value in os.environ.items():
+                if key.startswith("r") and key[1].isdigit():
                     result.append(value)
-                    i += 1
-                except KeyError:
-                    break
             
             # Create an ordered list as a single string; each string is on a new line
             return "\n".join(f"{index+1}. {value}" for index, value in enumerate(result))
