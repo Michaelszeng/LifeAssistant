@@ -14,30 +14,47 @@ Technologies used:
 Note: LifeAssistant requires Pushover, which charges a one-time $5 fee beyond the 30-day trial.
 
 
+## Installation and Setup
+
 #### Modal Installation and Setup
+1. Create account on [Modal](https://modal.com/login)
+2. Install dependencies: `pip install -r requirements.txt`
+3. Run `modal setup` to authenticate (if this doesn’t work, try `python -m modal setup`)
 
 
-#### Creating Google Cloud Platform Credentials
-1. Project Creation
-2. Service account stuff
+#### Google Cloud Platform (GCP) Credentials, Firestore, and Tasks Setup
+1. [Sign into GCP](https://console.cloud.google.com/) using you desired Google Account
+2. Select "Select a Project" and click "New Project". Give your project a name (i.e. LifeAssistant) and press "Create".
+3. [Create an App Engine application](https://console.cloud.google.com/appengine). Select a region for your application, and select "App Engine default service account" under **Identity and API access**. We technically do not need an App Engine application, but we create one here since it also generates a fully-permissioned service account we can use for authentication for the other APIs we need.
+4. [View your service accounts](https://console.cloud.google.com/iam-admin/serviceaccounts). Click the 3 dots next to the "App Engine default service account", and click "Manage keys". Also, make sure you save the email associated with the "App Engine default service account"; we will use this later in the **Setting Calendar Permissions** step.
+5. Under "ADD KEY", Select "Create new key". Create a new JSON key. This should download a JSON file to your computer.
+6. Rename this JSON file to "service_account.json" and move it into the `datafiles/` directory.
+
+##### Firestore
+1. From the Hamburger Menu, go to "APIs & Services" --> "Enabled APIs & Services".
+2. Click "+ ENABLE APIS AND SERVICES". Search for *Google Cloud Firestore API* and enable it.
+2. In the [Firestore dashboard](https://console.cloud.google.com/firestore/databases), press "CREATE DATABASE" and create a new default database (you do not need to change any configurations, just press "CREATE" ).
+3. In the Firestore dashboard, within the "(default)" database, press "+ START COLLECTION" to add a Collection and name it "LifeAssistant".
+
+LifeAssistant will now be able to store persistant data (such as Calendar sync tokens, a queue of scheduled notifications, etc.) in documents in Google Firestore!
+
+##### Tasks
+1. Using the same procedure as above, enable the *Cloud Tasks API*. Create a billing account if needed.
+2. In the [Tasks dashboard](https://console.cloud.google.com/cloudtasks), press "+ CREATE QUEUE". Name your queue "text-messages", select "us-central1 (Iowa)" as your region (this region is hardcoded so you can't use a different region without modifying the code). Press "CREATE".
+
+LifeAssistant will now be able to schedule tasks for itself (i.e. scheduled reminders for you in the future)!
+
+##### Calendar
+1. Using the same procedure as above, enable the *Google Calendar API*. That is all!
 
 
 #### Setting Calendar Permissions
-1. Go to the settings menu in your Google Calendar (gear icon top right corner)
+1. Go to the settings menu in your [Google Calendar](https://calendar.google.com/calendar) (gear icon top right corner)
 2. Click Settings for my calendar.
 3. Select the calendar you want to share.
 4. In Calendar settings, under Share with specific people or groups, click + Add people and groups
 5. Add your service account email with the permissions "See all event details" at a minimum
 6. Click Send.
-7. Within the same Google Cloud Project, also enable the *Calendar API* on Google Cloud Platform.
-
-
-#### Configuring Google Cloud Firestore
-1. Within the same Google Cloud Project, enable the *Firestore API* on Google Cloud Platform.
-2. In the Firestore dashboard, create a new default database.
-3. In the Frestore dashboard, within the "(default)" database, add a Collection and name it "LifeAssistant".
-
-LifeAssistant will now be able to store persistant data (such as Calendar sync tokens, a queue of scheduled notifications, etc.) in documents in Google Firestore!
 
 
 #### Todoist App Setup
@@ -78,8 +95,8 @@ LifeAssistant utilizes Meta AI's pre-trained Meta-Llama-3-8B-Instruct model to a
 3. [Rquest Access to Meta-Llama-3-8B-Instruct.](https://huggingface.co/meta-llama/Meta-Llama-3-8B-Instruct) This may take some time to get approved.
 
 
-#### Data File
-- Create a file in the outermost directory called `data.py`
+#### Data File Setup
+- Create a file `data_files/data.py`
 - Enter this data into `data.py`:
 ```python
 google_cloud_project_id = 'Your Google Cloud Project ID (i.e. `lifeassistant-123456`)'
@@ -95,14 +112,41 @@ huggingface_token = "Your HuggingFace token"
 You can find your calendar ID by going to your Google Calendar, clicking on the three dots next to your calendar in the bottom left, --> "Settings and Sharing" --> "Calendar ID".
 
 
-### Common Links to Monitor LifeAssistant Status and Credit Usage
+#### `reminders.py`
+Use natural language to tell LifeAssistant what to remind you about. Compile a python list of reminders you want in `reminders.py`.
+
+Here are a few examples:
+```
+reminders = [
+    "If I am going to book a flight, please remind me to try to select a window seat on the left side of the plane. Note that I do not need this reminder if I have already booked the flight and am just taking the flight.",
+    "If I am going to have an exam, midterm, or final, please remind me to refill my water bottle and pack tissue paper.",
+    "If I am going to fly home to San Diego, remind me to put on a jacket when I arrive in San Diego so I don't get sick.",
+    "If I am going to get a blood test, remind me to print out the lab order beforehand.",
+]
+```
+
+
+#### Deployment
+To test your setup, run `modal serve modal_function.py`. This will deploy your app temporarily, until you hit `Ctrl + C` in your terminal to shut the app down. While you app is served, you can create calendar events or Todoist tasks, see debug print messages in your terminal, and see that your LifeAssistant successfully sends you appropriate reminders on your mobile device.
+
+
+When you are ready to fully deploy your LifeAssistant, run:
+```
+modal deploy modal_function.py
+```
+
+Your LifeAssistant is now live!
+
+
+## Common Links to Monitor LifeAssistant Status and Credit Usage
 - [Modal Dashboard for Cloud Function/Compute/Storage Usage](https://modal.com/apps/)
+- [Google Cloud Platform Billing Dashboard](https://console.cloud.google.com/billing)
 - [Google Cloud Tasks Queue](https://console.cloud.google.com/cloudtasks)
 - [Google Cloud Firestore File Storage](https://console.cloud.google.com/firestore/databases)
 - [Todoist Dashboard](https://developer.todoist.com/appconsole.html)
 
-### Disclaimers:
 
+## Disclaimers:
 One underlying assumption is that the Modal function is invoked at least once every 30 days, or else the Google Calendar Watcher will expire without getting renewed. If 30 days does pass without the function being invoked, making or updating a task in Todoist (or invoking the function in some other way) will revive the Calendar watcher.
 
 
