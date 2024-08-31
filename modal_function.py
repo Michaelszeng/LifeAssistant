@@ -82,64 +82,6 @@ def store_calendar_watcher_data(db, resource_id, channel_id):
     })
 
 
-def get_scheduled_tasks(db):
-    doc_ref = db.collection(COLLECTION).document(TASKS_DOC)
-    doc = doc_ref.get()
-    
-    if doc.exists:
-        data = doc.to_dict().get('tasks', [])
-    else:
-        data = []
-    
-    return data
-
-
-def add_scheduled_task(db, log_entry):
-    doc_ref = db.collection(COLLECTION).document(TASKS_DOC)
-    doc = doc_ref.get()
-    
-    if doc.exists:
-        data = doc.to_dict().get('tasks', [])
-    else:
-        data = []
-    
-    data.append(log_entry)
-    
-    doc_ref.set({
-        'tasks': data
-    })
-
-
-def remove_scheduled_task(db, event_id):
-    data = get_scheduled_tasks(db)
-
-    # Find the task corresponding to the event_id
-    task_to_delete = None
-    for entry in data:
-        if entry['event_id'] == event_id:
-            task_to_delete = entry
-            break
-
-    if not task_to_delete:
-        # print(f"No task found for event_id: {event_id}")
-        return None
-
-    task_name = task_to_delete['task_name']
-
-    # Remove the task from the list
-    updated_data = [entry for entry in data if entry['event_id'] != event_id]
-
-    # Write the updated list back to the Firestore document
-    doc_ref = db.collection(COLLECTION).document(TASKS_DOC)
-    doc_ref.set({
-        'tasks': updated_data
-    })
-    
-    print(f"Log entry for event_id {event_id} deleted successfully.")
-
-    return task_name
-
-
 def stop_calendar_watcher(service, resource_id, channel_id):
     request_body = {
         'id': channel_id,
@@ -174,6 +116,57 @@ def start_calendar_watcher(db, service):
 
     except Exception as e:
         print('An error occurred:', e)
+
+
+def get_scheduled_tasks(db):
+    doc_ref = db.collection(COLLECTION).document(TASKS_DOC)
+    doc = doc_ref.get()
+    
+    if doc.exists:
+        data = doc.to_dict().get('tasks', [])
+    else:
+        data = []
+    
+    return data, doc_ref
+
+
+def add_scheduled_task(db, log_entry):
+    data, doc_ref = get_scheduled_tasks(db)
+    
+    data.append(log_entry)
+    
+    doc_ref.set({
+        'tasks': data
+    })
+
+
+def remove_scheduled_task(db, event_id):
+    data, doc_ref = get_scheduled_tasks(db)
+
+    # Find the task corresponding to the event_id
+    task_to_delete = None
+    for entry in data:
+        if entry['event_id'] == event_id:
+            task_to_delete = entry
+            break
+
+    if not task_to_delete:
+        # print(f"No task found for event_id: {event_id}")
+        return None
+
+    task_name = task_to_delete['task_name']
+
+    # Remove the task from the list
+    updated_data = [entry for entry in data if entry['event_id'] != event_id]
+
+    # Write the updated list back to the Firestore document
+    doc_ref.set({
+        'tasks': updated_data
+    })
+    
+    print(f"Log entry for event_id {event_id} deleted successfully.")
+
+    return task_name
 
 
 def schedule_text_message(db, event_id, message, schedule_time):
@@ -427,8 +420,9 @@ class Model:
                     print('GCal event made or modified:', event)
                     event_id = event.get('id')
 
-                    # In case this event has been modified instead of created, attempt to cancel its associated text message.
-                    # If this event is new, cancel_text_message() will fail gracefully
+                    # In case this event has been modified instead of created, attempt to cancel its associated text message
+                    # by removing the task from Google Cloud Tasks and deleting the entry in the "scheduled_tasks" log.
+                    # If this event is new, the attempted cancelation will fail gracefully
                     cancel_text_message(db, event_id)
 
                     # Extract event start datetime
@@ -441,7 +435,7 @@ class Model:
                         event_start_time = time_zone.localize(naive_datetime)
                     else:
                         event_start_time = naive_datetime
-                    text_schedule_time = event_start_time - timedelta(hours=4)  # Ready to be passed to schedule_text_message()
+                    text_schedule_time = event_start_time - timedelta(hours=4)
 
                     message = "scheduled test!"
                     schedule_text_message(db, event_id, message, text_schedule_time)
