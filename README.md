@@ -1,6 +1,6 @@
 # Life Assistant
 
-A LLM Integration with your Google Calendar and Todoist to send you relevant reminders (via text message) related your events and tasks. You can customize/slowly accrue the list of reminders you want.
+A LLM Integration with your Google Calendar and Todoist to send you relevant reminders related your events and tasks. You can customize/slowly accrue the list of reminders you want.
 
 <img src="demo.png" alt="Example of reminder notifications" style="width:30%;">
 
