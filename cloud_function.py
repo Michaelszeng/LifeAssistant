@@ -114,6 +114,8 @@ def add_scheduled_task(log_entry):
         'tasks': data
     })
 
+    print(f"Log entry for event_id {log_entry['event_id']} CREATED successfully.")
+
 
 def remove_scheduled_task(event_id):
     data = get_scheduled_tasks()
@@ -140,7 +142,7 @@ def remove_scheduled_task(event_id):
         'tasks': updated_data
     })
     
-    print(f"Log entry for event_id {event_id} deleted successfully.")
+    print(f"Log entry for event_id {event_id} DELETED successfully.")
 
     return task_name
 
@@ -217,16 +219,13 @@ def schedule_text_message(event_id, message, schedule_time):
     task_name = response.name
     print(f'Task created: {task_name}')
 
-    # Write the payload and task_name to a JSON file for tracking
+    # Write the payload and task_name to a JSON file in Firestore for tracking
     log_entry = {
         'task_name': task_name,
         'event_id': event_id,
         'schedule_time': schedule_time.isoformat()
     }
     add_scheduled_task(log_entry)
-
-    # TEMPORARY
-    send_push_notif("this is a test message!", event_id)
 
     return task_name
 
@@ -366,7 +365,7 @@ def main(request: Optional[dict[str, Any]] = None) -> str:
                 naive_datetime = datetime.fromisoformat(date_time_str)
                 time_zone = pytz.timezone(time_zone_str)
                 event_start_time = time_zone.localize(naive_datetime)
-                text_schedule_time = event_start_time - timedelta(hours=4)  # Ready to be passed to schedule_text_message()
+                text_schedule_time = event_start_time - timedelta(hours=4)
 
                 message = "test!"
                 schedule_text_message(event_id, message, text_schedule_time)

@@ -15,6 +15,7 @@ import uuid
 import json
 import os
 import pytz
+import textwrap
 import time
 
 from data_files.data import *
@@ -138,6 +139,8 @@ def add_scheduled_task(db, log_entry):
     doc_ref.set({
         'tasks': data
     })
+    
+    print(f"Log entry for event_id {log_entry['event_id']} CREATED successfully.")
 
 
 def remove_scheduled_task(db, event_id):
@@ -164,7 +167,7 @@ def remove_scheduled_task(db, event_id):
         'tasks': updated_data
     })
     
-    print(f"Log entry for event_id {event_id} deleted successfully.")
+    print(f"Log entry for event_id {event_id} DELETED successfully.")
 
     return task_name
 
@@ -205,16 +208,13 @@ def schedule_text_message(db, event_id, message, schedule_time):
     task_name = response.name
     print(f'Task created: {task_name}')
 
-    # Write the payload and task_name to a JSON file for tracking
+    # Write the payload and task_name to a JSON file in Firestore for tracking
     log_entry = {
         'task_name': task_name,
         'event_id': event_id,
         'schedule_time': schedule_time.isoformat()
     }
     add_scheduled_task(db, log_entry)
-
-    # TEMPORARY
-    send_push_notif(db, "this is a test message!", event_id)
 
     return task_name
 
@@ -264,10 +264,67 @@ def build_calendar():
     return service
 
 
+def llm_inference(pipe, summary, description, reminders, max_length=100):
+    """
+    Perform a Llama inference based on the task/calendar event data.
+    """ 
+    if description != '':
+        input_text = f"""Here is the task or event name: {summary}; here is the task or event description: {description}.\n\nHere is a list of things I would like you to remind me about: \n\n{reminders}\n\nOtherwise, do not write a reminder at all."""
+    else:
+        input_text = f"""Here is the task or event name: {summary}.\n\nHere is a list of things I would like you to remind me about: \n\n{reminders}\n\nOtherwise, do not write a reminder at all."""
+    
+    system_prompt="""
+        You are a highly selective automated reminder system. Your task is to evaluate the relevance of an event or task against a list of 
+        reminder items. Only generate a reminder if there is a clear and direct connection between the event or task and the reminder items. 
+        Respond with 'True/False: "Reminder text"', where 'True' indicates a valid reminder, and 'False' indicates no relevance. Ensure 
+        reminders are concise (up to 12 words) and optimistic/exciting. If uncertain, default to 'False' with an empty reminder text.
+    """
+
+    system_prompt = system_prompt.replace('\n', '')
+
+    messages = [
+        {
+            "role": "system",
+            "content": system_prompt,
+        },
+        {   
+            "role": "user", 
+            "content": input_text,
+        },
+    ]
+
+    prompt = pipe.tokenizer.apply_chat_template(
+        messages,
+        tokenize=False,
+        add_generation_prompt=True
+    )
+
+    terminators = [
+        pipe.tokenizer.eos_token_id,
+        pipe.tokenizer.convert_tokens_to_ids("<|eot_id|>")
+    ]
+
+    print("BEGINNING INFERENCE")
+    outputs = pipe(
+        prompt,
+        max_new_tokens=max_length,
+        eos_token_id=terminators,
+        do_sample=False,  # Deterministic output
+    )
+
+    output_text = outputs[0]["generated_text"][len(prompt):]
+    print(input_text)
+    print()
+    print(f"{output_text.split(":")[0]}: {output_text.split(":")[-1][2:-1]}")
+    print("\n-----------------------------------------------------------------------------------------------------------------\n")
+
+    return output_text.split(":")[-1][2:-1]
+
+
 ################################################################################
 ### Modal App
 ################################################################################
-@app.cls(gpu="any", image=image, mounts=[modal.Mount.from_local_dir(os.path.join(os.getcwd(), "data_files"), remote_path="/root/data_files")])
+@app.cls(gpu="any", image=image, mounts=[modal.Mount.from_local_dir(os.path.join(os.getcwd(), "data_files"), remote_path="/root/data_files")], secrets=[modal.Secret.from_name("reminders")])
 class Model:
 
     @modal.build()  # add another step to the image build
@@ -352,7 +409,7 @@ class Model:
         store_token(db, sync_token)   
 
 
-    @modal.method()
+    @modal.enter()
     def setup(self):
         """
         Runs during container's start (i.e. very cold start), but not every time 
@@ -362,7 +419,6 @@ class Model:
         print("RUNNING SETUP.")
 
         torch.set_default_device('cuda')
-        self.tokenizer = AutoTokenizer.from_pretrained('/root/llama')
         self.pipe = transformers.pipeline(
             "text-generation",
             model="/root/llama",
@@ -394,6 +450,24 @@ class Model:
 
         data is a dictionary containing json data in POST request.
         """
+        
+        def build_reminders_string():
+            """
+            Helper function to retrieve reminders list from Modal secrets and compile into a string to feed to LLM
+            """
+            result = []
+            i = 0
+            while True:  # Loop to fetch all environment variables r0, r1, r2, etc.
+                try:
+                    value = os.environ[f"r{i}"]
+                    result.append(value)
+                    i += 1
+                except KeyError:
+                    break
+            
+            # Create an ordered list as a single string; each string is on a new line
+            return "\n".join(f"{index+1}. {value}" for index, value in enumerate(result))
+
         print("START WEB ENDPOINT.")
         print(f"\nReceived data: {data}\n")
 
@@ -437,7 +511,7 @@ class Model:
                         event_start_time = naive_datetime
                     text_schedule_time = event_start_time - timedelta(hours=4)
 
-                    message = "scheduled test!"
+                    message = llm_inference(self.pipe, event.get("summary"), event.get("description"), build_reminders_string())
                     schedule_text_message(db, event_id, message, text_schedule_time)
 
                 elif event.get('status', "") == "cancelled":  # Event made or modified
@@ -467,8 +541,8 @@ class Model:
                 time_zone = pytz.timezone('America/New_York')
                 now = datetime.now(time_zone)
                 text_schedule_time = now + timedelta(seconds=15)  # Make task scheduled slightly in the future
-
-                message = "test!"
+                
+                message = llm_inference(self.pipe, data['event_data']['content'], data['event_data']['description'], build_reminders_string())
                 schedule_text_message(db, task_id, message, text_schedule_time)
 
             else:
