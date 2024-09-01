@@ -1,24 +1,32 @@
-# Life Assistant
+# LifeAssistant
 
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
-A LLM Integration with your Google Calendar and Todoist task-list to send you relevant reminders related your events and tasks. You can customize/slowly accrue the list of reminders you want.
+Do you always forget stupid things? Filling your water bottle before a 3-hour exam? Packing your earbuds when you travel? Then LifeAssistant is for you! LifeAssistant is a LLM Integration with your Google Calendar and Todoist task-list to send you relevant reminders for your events and tasks. You can customize/slowly accrue the list of things you want LifeAssistant to remind you about.
 
 <img src="demo.png" alt="Example of reminder notifications" style="width:30%;">
 
+### How it Works:
+
+LifeAssistant exists as a serverless cloud function, utilizing the Google Calendar API and and Todoist API to invoke the cloud function as a HTTP webhook upon the creation or modification of calendar or to-do list tasks and events. Whenever LifeAssistant is invoked, it prompts the large language model Llama to determine whether the invoking task or event warrants sending a reminder to the user, in which case, it will generate a reminider and schedule a push-notification to the user's mobile device ahead of the task or event. The user, meanwhile, can continually add or remove items from a list of natural-language "requests" about things they want to be reminded about.
+
+For the end-user, this means that you only need to deploy this app once, keep building that list of things you need reminders for, and otherwise sit back and let LifeAssistant do its work.
+
 ### Technologies used:
-- Modal for severless hosting of a function with GPU access for LLM inference
-- Google Cloud Firestore for NoSQL database storage of persistent data for the Modal function
-- Llama 3.1 running "locally" for natural language analysis of tasks and calendar events and generation of reminders
-- Google Cloud Tasks for scheduled notifications
-- Google Calendar API to read calendar events and changes
-- Todoist API to read tasks and changes
-- Pushover to send push notifications to a mobile device
+- **[Modal](https://modal.com/)** for severless hosting of a function with GPU access for LLM inference
+- **Google Cloud Firestore** for NoSQL database storage of persistent data for the Modal function
+- **[Llama 3.1](https://llama.meta.com/)** running "locally" for natural language analysis of tasks and calendar events and generation of reminders
+- **Google Cloud Tasks** for scheduled notifications
+- **Google Calendar API** to read calendar events and changes
+- **[Todoist API](https://todoist.com/)** to read tasks and changes
+- **[Pushover](https://pushover.net/)** to send push notifications to a mobile device
 
 Note: LifeAssistant requires Pushover, which charges a one-time $5 fee beyond the 30-day trial.
 
 
 ## Installation and Setup
+
+Estimated time: 20 min.
 
 ### Modal Installation and Setup
 1. Create account on [Modal](https://modal.com/login)
@@ -133,8 +141,7 @@ A few examples of what I remind myself to do:
 
 
 ### Deployment
-To test your setup, run `modal serve modal_function.py`. This will deploy your app temporarily, until you hit `Ctrl + C` in your terminal to shut the app down. While you app is served, you can create calendar events or Todoist tasks, see debug print messages in your terminal, and see that your LifeAssistant successfully sends you appropriate reminders on your mobile device.
-
+To test your setup, run `modal serve modal_function.py`. This will deploy your app temporarily, until you hit `Ctrl + C` in your terminal to shut the app down. While you app is served, you can create calendar events or Todoist tasks, see debug print messages in your terminal, and see that your LifeAssistant successfully sends you appropriate reminders on your mobile device. Note that the LifeAssistant is hardcoded to send notifications 4 hours ahead of the start time of Google Calendar events.
 
 When you are ready to fully deploy your LifeAssistant, run:
 ```
