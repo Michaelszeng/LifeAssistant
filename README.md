@@ -70,7 +70,7 @@ LifeAssistant will now be able to schedule tasks for itself (i.e. scheduled remi
 
 
 ### Todoist App Setup
-1. Log into Todoist and create a new app in your Todoist Developer Console (https://developer.todoist.com/appconsole.html)
+1. Log into Todoist and create a new app in your [Todoist Developer Console](https://developer.todoist.com/appconsole.html)
 2. Set "OAuth redirect URL" to `https://todoist.com/oauth/authorize`
 3. Set "Webhook callback URL" to your Modal Function URL
 4. Add the following items to "Watched Events":
