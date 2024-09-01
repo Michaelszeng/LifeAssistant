@@ -119,6 +119,40 @@ def start_calendar_watcher(db, service):
         print('An error occurred:', e)
 
 
+def schedule_next_calendar_watcher_refresh():
+    client = tasks_v2.CloudTasksClient()
+
+    # Define the queue path
+    project = google_cloud_project_id
+    queue = 'text-messages'
+    location = 'us-central1'
+    parent = client.queue_path(project, location, queue)
+
+    # Prepare the payload
+    payload = {
+        'refresh_calendar_watcher': True,
+    }
+
+    # Create the task
+    task = {
+        'http_request': {  
+            'http_method': tasks_v2.HttpMethod.POST,
+            'url': modal_function_address,  
+            'headers': {'Content-Type': 'application/json'},
+            'body': json.dumps(payload).encode()
+        },
+    }
+
+    time_zone = pytz.timezone(time.tzname[0] if time.daylight == 0 else time.tzname[1])
+    schedule_time = datetime.now(time_zone) + timedelta(days=30)  # Make task scheduled slightly in the future
+    task['schedule_time'] = schedule_time
+
+    # Create the task in the queue
+    response = client.create_task(parent=parent, task=task)
+    task_name = response.name
+    print(f'Calendar Refresh Task created: {task_name}')
+
+
 def get_scheduled_tasks(db):
     doc_ref = db.collection(COLLECTION).document(TASKS_DOC)
     doc = doc_ref.get()
@@ -364,6 +398,8 @@ class Model:
             stop_calendar_watcher(service, resource_id, channel_id)
         # Establish new watcher
         start_calendar_watcher(db, service)
+        # Set task for 30 days in advance to refresh the calendar watcher
+        schedule_next_calendar_watcher_refresh()
 
         ########################################################################
         ### Get Initial Sync with Calendar
@@ -429,21 +465,9 @@ class Model:
             },
         )
 
-        # First re-establish calendar watcher so that it never expires
-        service = build_calendar()
-        db = firestore.Client()
-        resource_id, channel_id = get_calendar_watcher_data(db)
-        if resource_id and channel_id:  # Stop the old watcher
-            try:
-                stop_calendar_watcher(service, resource_id, channel_id)
-            except:
-                print("stop_calendar_watcher() failed.")
-        # Establish new watcher
-        start_calendar_watcher(db, service)
-
 
     # @app.local_entrypoint()  # Use this instead of the below during development to run the function automatically, not as a web endpoint
-    @modal.web_endpoint(method="POST", label="webhook-v2")
+    @modal.web_endpoint(method="POST", label="webhook-v3")
     def web_endpoint(self, data: Optional[dict[str, Any]] = None):
         """
         Runs whenever the HTTP endpoint is used.
@@ -508,7 +532,7 @@ class Model:
 
                     remind_bool, message = llm_inference(self.pipe, event.get("summary"), event.get("description"), build_reminders_string())
                     if remind_bool:
-                        schedule_text_message(db, task_id, message, text_schedule_time)
+                        schedule_text_message(db, event_id, message, text_schedule_time)
 
                 elif event.get('status', "") == "cancelled":  # Event made or modified
                     print('GCal event cancelled:', event)
@@ -526,6 +550,15 @@ class Model:
             if 'text_message' in data:  # Text message task
                 send_push_notif(db, data['message'], data['event_id'])
 
+            elif 'refresh_calendar_watcher' in data:  # Refresh calendar watcher task
+                resource_id, channel_id = get_calendar_watcher_data(db)
+                if resource_id and channel_id:  # Stop the old watcher
+                    stop_calendar_watcher(service, resource_id, channel_id)
+                # Establish new watcher
+                start_calendar_watcher(db, service)
+                # Schedule next refresh
+                schedule_next_calendar_watcher_refresh()
+
             # TODOist task update
             elif 'event_name' in data and data['event_data']['project_id'] in todoist_projects and not data['event_data']['is_deleted'] and (data['event_name'] == 'item:added' or data['event_name'] == 'item:updated'):
                 # Process the new task
@@ -534,9 +567,8 @@ class Model:
                 task_id = data['event_data']['v2_id']
 
                 # Get the current time in the specified timezone
-                time_zone = pytz.timezone('America/New_York')
-                now = datetime.now(time_zone)
-                text_schedule_time = now + timedelta(seconds=15)  # Make task scheduled slightly in the future
+                time_zone = pytz.timezone(time.tzname[0] if time.daylight == 0 else time.tzname[1])
+                text_schedule_time = datetime.now(time_zone) + timedelta(seconds=15)  # Make task scheduled slightly in the future
                 
                 remind_bool, message = llm_inference(self.pipe, data['event_data']['content'], data['event_data']['description'], build_reminders_string())
                 if remind_bool:
