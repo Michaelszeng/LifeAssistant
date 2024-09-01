@@ -80,8 +80,11 @@ LifeAssistant will now be able to schedule tasks for itself (i.e. scheduled remi
 6. Perform Todoist webhook Authorization procedure (See ["Webhook Activation & Personal Use"](https://developer.todoist.com/sync/v8/#webhooks))
 
     a. Enter the following string into your browser, replacing the `client_id` with the actual Client ID of your Todoist app (found in your Todoist Developer Console): `https://todoist.com/oauth/authorize?client_id=0123456789abcdef&scope=data:read,data:delete&state=secretstring`
-    b. Press "Agree"
+
+    b. Press "Agree".
+
     c. This should redirect you to a url containing a `code`. Copy this code.
+    
     d. In a command line, run this command, replacing the `client_id` and `client_secret` with their respective values from your Todoist Developer Console and replacing `code` with the code you got in step *6. c.*:
     ```bash
     $ curl "https://todoist.com/oauth/access_token" \
