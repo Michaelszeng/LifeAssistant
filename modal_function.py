@@ -20,7 +20,7 @@ import time
 
 from data_files.data import *
 
-app = modal.App()
+app = modal.App("LifeAssistant")
 
 image = (
     modal.Image.debian_slim(python_version="3.10")
