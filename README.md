@@ -40,7 +40,7 @@ Estimated time: 20 min.
 3. [Create an App Engine application](https://console.cloud.google.com/appengine). Select a region for your application, and select "App Engine default service account" under **Identity and API access**. We technically do not need an App Engine application, but we create one here since it also generates a fully-permissioned service account we can use for authentication for the other APIs we need.
 4. [View your service accounts](https://console.cloud.google.com/iam-admin/serviceaccounts). Click the 3 dots next to the "App Engine default service account", and click "Manage keys". Also, make sure you save the email associated with the "App Engine default service account"; we will use this later in the **Setting Calendar Permissions** step.
 5. Under "ADD KEY", Select "Create new key". Create a new JSON key. This should download a JSON file to your computer.
-6. Rename this JSON file to "service_account.json" and move it into the `datafiles/` directory.
+6. Rename this JSON file to "service_account.json" and move it into a directory called `data_files/`.
 
 #### Firestore
 1. From the Hamburger Menu, go to "APIs & Services" --> "Enabled APIs & Services".
@@ -84,7 +84,7 @@ LifeAssistant will now be able to schedule tasks for itself (i.e. scheduled remi
     b. Press "Agree".
 
     c. This should redirect you to a url containing a `code`. Copy this code.
-    
+
     d. In a command line, run this command, replacing the `client_id` and `client_secret` with their respective values from your Todoist Developer Console and replacing `code` with the code you got in step *6. c.*:
     ```bash
     $ curl "https://todoist.com/oauth/access_token" \
