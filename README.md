@@ -167,8 +167,6 @@ Modal gives $30 of free monthly credits. All Google Products should be able to b
 
 
 ## Credits
-
-This project makes use of the following open-source libraries:
 - **example-py-gcal-api-cloud-function** by ayvi-0001. Licensed under the [MIT License](https://opensource.org/licenses/MIT).
   - Repository: https://github.com/ayvi-0001/example-py-gcal-api-cloud-function
 - **aw-import-ical**. Repository: https://github.com/ActivityWatch/aw-import-ical/
