@@ -1,7 +1,5 @@
 # LifeAssistant
 
-![License](https://img.shields.io/badge/license-MIT-blue)
-
 Do you always forget stupid things? Filling your water bottle before a 3-hour exam? Packing your earbuds when you travel? Then LifeAssistant is for you! LifeAssistant is a LLM Integration with your Google Calendar and Todoist task-list to send you relevant reminders for your events and tasks. You can customize/slowly accrue the list of things you want LifeAssistant to remind you about.
 
 <img src="demo.png" alt="Example of reminder notifications" style="width:30%;">
