@@ -116,7 +116,7 @@ LifeAssistant utilizes Meta AI's pre-trained Meta-Llama-3-8B-Instruct model to a
 ```python
 google_cloud_project_id = 'Your Google Cloud Project ID (i.e. `lifeassistant-123456`)'
 calendar_id = 'Your Calendar ID (i.e. 'primary', or 'your_email@gmail.com')'
-modal_function_address = 'Your Modal Function URL' (i.e. https://[your-Modal-account-username]--webhook-v3.modal.run)
+modal_function_address = 'Your Modal Function URL (i.e. https://[your-Modal-account-username]--webhook-v3.modal.run)'
 todoist_api_token = 'Your Todoist account API token (see https://todoist.com/help/articles/find-your-api-token)'
 todoist_projects = ['0123456789', '9876543210']  # List of project ID's whose tasks you want LifeAssistant to be able to see. You can find your project's ID by opening your Todoist project in the web-version of Todoist and extracting it from the URL.
 pushover_api_token = "Your Pushover Application API Token/Key"
