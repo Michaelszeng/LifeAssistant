@@ -123,18 +123,19 @@ def schedule_next_calendar_watcher_refresh():
     client = tasks_v2.CloudTasksClient()
 
     # Define the queue path
-    project = google_cloud_project_id
-    queue = 'text-messages'
-    location = 'us-central1'
-    parent = client.queue_path(project, location, queue)
+    parent = client.queue_path(google_cloud_project_id, 'us-central1', 'text-messages')
 
     # Prepare the payload
     payload = {
         'refresh_calendar_watcher': True,
     }
 
+    # Define a fixed task name
+    task_name = client.task_path(google_cloud_project_id, 'us-central1', 'text-messages', 'refresh-calendar-watcher-task')
+
     # Create the task
     task = {
+        'name': task_name,
         'http_request': {  
             'http_method': tasks_v2.HttpMethod.POST,
             'url': modal_function_address,  
@@ -143,14 +144,22 @@ def schedule_next_calendar_watcher_refresh():
         },
     }
 
+    # Set the schedule time
     time_zone = pytz.timezone(time.tzname[0] if time.daylight == 0 else time.tzname[1])
-    schedule_time = datetime.now(time_zone) + timedelta(days=30)  # Make task scheduled slightly in the future
-    task['schedule_time'] = schedule_time
+    schedule_time = datetime.now(time_zone) + timedelta(days=30)
+    timestamp = timestamp_pb2.Timestamp()
+    timestamp.FromDatetime(schedule_time)
+    task['schedule_time'] = timestamp
 
     # Create the task in the queue
-    response = client.create_task(parent=parent, task=task)
-    task_name = response.name
-    print(f'Calendar Refresh Task created: {task_name}')
+    try:
+        response = client.create_task(parent=parent, task=task)
+        print(f'Calendar Refresh Task created: {response.name}')
+        return True
+    except Exception as e:
+        if 'ALREADY_EXISTS' in str(e):
+            print('Calendar Refresh Task already exists.')
+            return False
 
 
 def get_scheduled_tasks(db):
@@ -396,10 +405,11 @@ class Model:
         resource_id, channel_id = get_calendar_watcher_data(db)
         if resource_id and channel_id:  # Stop the old watcher
             stop_calendar_watcher(service, resource_id, channel_id)
-        # Establish new watcher
-        start_calendar_watcher(db, service)
         # Set task for 30 days in advance to refresh the calendar watcher
-        schedule_next_calendar_watcher_refresh()
+        scheduled_successfully = schedule_next_calendar_watcher_refresh()  # scheduled_successfully should be True so long as we are not creating duplicate calendar refresh tasks
+        if scheduled_successfully:
+            # Establish new watcher
+            start_calendar_watcher(db, service)
 
         ########################################################################
         ### Get Initial Sync with Calendar
@@ -554,10 +564,11 @@ class Model:
                 resource_id, channel_id = get_calendar_watcher_data(db)
                 if resource_id and channel_id:  # Stop the old watcher
                     stop_calendar_watcher(service, resource_id, channel_id)
-                # Establish new watcher
-                start_calendar_watcher(db, service)
                 # Schedule next refresh
-                schedule_next_calendar_watcher_refresh()
+                scheduled_successfully = schedule_next_calendar_watcher_refresh()  # scheduled_successfully should be True so long as we are not creating duplicate calendar refresh tasks
+                if scheduled_successfully:
+                    # Establish new watcher
+                    start_calendar_watcher(db, service)
 
             # TODOist task update
             elif 'event_name' in data and data['event_data']['project_id'] in todoist_projects and not data['event_data']['is_deleted'] and (data['event_name'] == 'item:added' or data['event_name'] == 'item:updated'):

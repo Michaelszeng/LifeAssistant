@@ -75,7 +75,6 @@ LifeAssistant will now be able to schedule tasks for itself (i.e. scheduled remi
 3. Set "Webhook callback URL" to your Modal Function URL
 4. Add the following items to "Watched Events":
  - `item:added`
- - `item:updated`
 5. Click "Activate webhook"
 6. Perform Todoist webhook Authorization procedure (See ["Webhook Activation & Personal Use"](https://developer.todoist.com/sync/v8/#webhooks))
 
