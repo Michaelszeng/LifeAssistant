@@ -1,6 +1,6 @@
 # LifeAssistant
 
-![License](https://img.shields.io/badge/license-MIT-blue)
+![Main Test ](https://img.shields.io/badge/Main%20Test-passing-brightgreen)
 
 Do you always forget stupid things? Filling your water bottle before a 3-hour exam? Packing your earbuds when you travel? Then LifeAssistant is for you! LifeAssistant is a LLM Integration with your Google Calendar and Todoist task-list to send you relevant reminders for your events and tasks. You can customize/slowly accrue the list of things you want LifeAssistant to remind you about.
 
@@ -73,7 +73,7 @@ LifeAssistant will now be able to schedule tasks for itself (i.e. scheduled remi
 1. Log into Todoist and create a new app in your [Todoist Developer Console](https://developer.todoist.com/appconsole.html)
 2. Set "OAuth redirect URL" to `https://todoist.com/oauth/authorize`
 3. Set "Webhook callback URL" to your Modal Function URL
-4. Add the following items to "Watched Events":
+4. Add the following item(s) to "Watched Events":
  - `item:added`
 5. Click "Activate webhook"
 6. Perform Todoist webhook Authorization procedure (See ["Webhook Activation & Personal Use"](https://developer.todoist.com/sync/v8/#webhooks))
@@ -116,8 +116,8 @@ LifeAssistant utilizes Meta AI's pre-trained Meta-Llama-3-8B-Instruct model to a
 ```python
 google_cloud_project_id = 'Your Google Cloud Project ID (i.e. `lifeassistant-123456`)'
 calendar_id = 'Your Calendar ID (i.e. 'primary', or 'your_email@gmail.com')'
-modal_function_address = 'Your Modal Function URL' (i.e. https://[your-Modal-account-username]--webhook-v3.modal.run)
-todoist_api_token = 'Your Todoist account API token (see https://todoist.com/help/articles/find-your-api-token-Jpzx9IIlB)'
+modal_function_address = 'Your Modal Function URL (i.e. https://[your-Modal-account-username]--webhook-v3.modal.run)'
+todoist_api_token = 'Your Todoist account API token (see https://todoist.com/help/articles/find-your-api-token)'
 todoist_projects = ['0123456789', '9876543210']  # List of project ID's whose tasks you want LifeAssistant to be able to see. You can find your project's ID by opening your Todoist project in the web-version of Todoist and extracting it from the URL.
 pushover_api_token = "Your Pushover Application API Token/Key"
 pushover_user_key = "Your Pushover Account User Key"
